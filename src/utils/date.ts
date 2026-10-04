@@ -20,3 +20,9 @@ export function formatISODate(iso: string): string {
   const [y, m, d] = iso.split('-').map(Number) as [number, number, number];
   return new Date(y, m - 1, d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
+
+/** Formats YYYY-MM (or YYYY-MM-DD) as e.g. "Mar 2031". */
+export function formatMonth(iso: string): string {
+  const [y, m] = iso.split('-').map(Number) as [number, number];
+  return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+}

@@ -12,6 +12,7 @@ import { useWealthData } from '../hooks/useWealthData';
 import type { Asset } from '../models/asset';
 import { calculateFamilyOwnedValue } from '../services/finance/allocation';
 import { projectContributions } from '../services/finance/contributionProjection';
+import { analyseLoan, projectTotalDebtByYear } from '../services/finance/loans';
 import {
   calculateFamilyProjection,
   calculateFutureValue,
@@ -35,7 +36,7 @@ const PERIOD_OPTIONS: { value: PeriodChoice; label: string }[] = [
 type Projected = { asset: Asset; today: number; future: number; rate: number | undefined };
 
 export function ProjectionsPage() {
-  const { assets, ownerships, contributions, wealth, loading, error } = useWealthData();
+  const { assets, ownerships, contributions, liabilities, wealth, loading, error } = useWealthData();
   const { settings } = useSettings();
   // Projections are estimates: shown in whole rupees.
   const fmt = (n: number) => formatINR(Math.round(n), settings.numberFormat);
@@ -71,6 +72,9 @@ export function ProjectionsPage() {
     assetRows.map((r, y) => ({ year: r.year, value: r.value + (contributed?.rows[y]?.value ?? 0), growth: null })),
   );
   const final = rows.at(-1);
+  // Loans reduce along their repayment schedules; loans without one are held flat.
+  const debt = years === null ? [] : projectTotalDebtByYear(liabilities, years).map(Math.round);
+  const unplannedLoans = liabilities.filter((l) => analyseLoan(l).kind !== 'schedule');
   const assetsFinal = assetRows.at(-1)?.value ?? 0;
   const contributedFinal = contributed?.rows.at(-1);
   // A single "overall rate" is only meaningful without new money coming in.
@@ -190,9 +194,53 @@ export function ProjectionsPage() {
                 <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
                   Family's share of each asset, compounded yearly at that asset's Base rate
                   {hasContributions && ', plus regular investments made from today at their expected return'}, rounded
-                  to the nearest rupee. Loans are not included yet.
+                  to the nearest rupee.
                 </p>
               </Card>
+
+              {liabilities.length > 0 && (
+                <Card className="mt-6">
+                  <h2 className="font-semibold">Net worth and loans</h2>
+                  <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                    Loans fall as EMIs are paid. EMIs are paid from income, so they don't reduce the assets above.
+                  </p>
+                  {unplannedLoans.length > 0 && (
+                    <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-200">
+                      Held at today's balance (no repayment plan): {unplannedLoans.map((l) => l.name).join(', ')}.{' '}
+                      <Link to="/liabilities" className="font-medium underline">
+                        Add EMI details
+                      </Link>
+                    </p>
+                  )}
+                  <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+                    <Stat label={`Loans in ${years}Y`} value={<span data-testid="projected-debt">{fmt(debt.at(-1)!)}</span>} />
+                    <Stat label={`Net worth in ${years}Y`} value={<span data-testid="projected-net-worth">{fmt(final.value - debt.at(-1)!)}</span>} />
+                  </dl>
+                  <table className="mt-4 w-full text-sm">
+                    <caption className="sr-only">Net worth by year</caption>
+                    <thead className="text-xs text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th scope="col" className="pb-1 text-left font-normal">Year</th>
+                        <th scope="col" className="hidden pb-1 text-right font-normal sm:table-cell">Assets</th>
+                        <th scope="col" className="pb-1 text-right font-normal">Loans</th>
+                        <th scope="col" className="pb-1 text-right font-normal">Net worth</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((r) => (
+                        <tr key={r.year} className="border-t border-slate-100 dark:border-slate-800">
+                          <th scope="row" className="py-1.5 text-left font-normal">
+                            {r.year === 0 ? 'Today' : `Year ${r.year}`}
+                          </th>
+                          <td className="hidden py-1.5 text-right tabular-nums sm:table-cell">{fmt(r.value)}</td>
+                          <td className="py-1.5 text-right tabular-nums text-slate-500 dark:text-slate-400">{fmt(debt[r.year]!)}</td>
+                          <td className="py-1.5 text-right font-medium tabular-nums">{fmt(r.value - debt[r.year]!)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </Card>
+              )}
 
               <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                 <Card>

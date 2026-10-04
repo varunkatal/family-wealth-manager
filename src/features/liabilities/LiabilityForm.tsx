@@ -4,9 +4,23 @@ import { Button } from '../../components/Button';
 import { FormField, inputClass } from '../../components/FormField';
 import type { FamilyMember } from '../../models/familyMember';
 import { LIABILITY_TYPES, liabilityInputSchema, type Liability, type LiabilityInput } from '../../models/liability';
-import { formatINRCompact, formatINRExact, parseAmountInput } from '../../utils/currency';
+import { analyseLoan, debtFreeMonth } from '../../services/finance/loans';
+import { formatINRExact, parseAmountInput } from '../../utils/currency';
+import { formatMonth, todayISODate } from '../../utils/date';
+import { amountHint, fieldErrors, numberText, parsePercent } from '../../utils/formInput';
 
-type FormValues = { name: string; type: string; ownerId: string; currentOutstanding: string; notes: string };
+type FormValues = {
+  name: string;
+  type: string;
+  ownerId: string;
+  originalAmount: string;
+  currentOutstanding: string;
+  interestRate: string;
+  monthlyEMI: string;
+  remainingMonths: string;
+  startDate: string;
+  notes: string;
+};
 type ErrorKey = keyof LiabilityInput;
 
 function toFormValues(liability: Liability | undefined, members: FamilyMember[]): FormValues {
@@ -15,9 +29,31 @@ function toFormValues(liability: Liability | undefined, members: FamilyMember[])
     name: liability?.name ?? '',
     type: liability?.type ?? '',
     ownerId: liability?.ownerId ?? (active.length === 1 ? active[0]!.id : ''),
-    currentOutstanding: liability ? String(liability.currentOutstanding) : '',
+    originalAmount: numberText(liability?.originalAmount),
+    currentOutstanding: numberText(liability?.currentOutstanding),
+    interestRate: numberText(liability?.interestRate),
+    monthlyEMI: numberText(liability?.monthlyEMI),
+    remainingMonths: numberText(liability?.remainingMonths),
+    startDate: liability?.startDate ?? '',
     notes: liability?.notes ?? '',
   };
+}
+
+const parseCount = (text: string) => (text.trim() === '' ? undefined : Number(text.trim()));
+
+function toInput(v: FormValues): LiabilityInput {
+  return {
+    name: v.name,
+    type: v.type,
+    ownerId: v.ownerId,
+    originalAmount: parseAmountInput(v.originalAmount),
+    currentOutstanding: parseAmountInput(v.currentOutstanding),
+    interestRate: parsePercent(v.interestRate),
+    monthlyEMI: parseAmountInput(v.monthlyEMI),
+    remainingMonths: parseCount(v.remainingMonths),
+    startDate: v.startDate,
+    notes: v.notes,
+  } as LiabilityInput;
 }
 
 type LiabilityFormProps = {
@@ -43,29 +79,18 @@ export function LiabilityForm({ liability, members, onSubmit, onCancel }: Liabil
   };
 
   const ownerOptions = members.filter((m) => m.isActive || m.id === values.ownerId);
-  const amount = parseAmountInput(values.currentOutstanding);
-  const amountHint =
-    amount === undefined || Number.isNaN(amount)
-      ? undefined
-      : amount >= 1e5
-        ? `${formatINRExact(amount)} · ${formatINRCompact(amount)}`
-        : formatINRExact(amount);
+
+  // Live preview of the repayment plan, only once the entered values are valid.
+  const parsed = liabilityInputSchema.safeParse(toInput(values));
+  const preview = parsed.success ? analyseLoan(parsed.data) : null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (saving) return;
-    const input = {
-      name: values.name,
-      type: values.type,
-      ownerId: values.ownerId,
-      currentOutstanding: amount,
-      notes: values.notes,
-    } as LiabilityInput;
-    const parsed = liabilityInputSchema.safeParse(input);
-    if (!parsed.success) {
-      const next: Partial<Record<ErrorKey, string>> = {};
-      for (const issue of parsed.error.issues) next[issue.path[0] as ErrorKey] ??= issue.message;
-      setErrors(next);
+    const input = toInput(values);
+    const result = liabilityInputSchema.safeParse(input);
+    if (!result.success) {
+      setErrors(fieldErrors<ErrorKey>(result.error.issues));
       return;
     }
     setSaving(true);
@@ -90,31 +115,25 @@ export function LiabilityForm({ liability, members, onSubmit, onCancel }: Liabil
     );
   }
 
+  const field = (key: ErrorKey, id: string) => ({ id, 'aria-invalid': !!errors[key], className: inputClass });
+
   return (
     <form onSubmit={(e) => void handleSubmit(e)} noValidate className="space-y-4">
       <FormField id="liability-name" label="Name" required error={errors.name}>
         <input
-          id="liability-name"
-          className={inputClass}
+          {...field('name', 'liability-name')}
           value={values.name}
           onChange={(e) => set('name', e.target.value)}
           placeholder="e.g. Home loan with Example Bank"
           autoFocus
           autoComplete="off"
           maxLength={120}
-          aria-invalid={!!errors.name}
         />
       </FormField>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <FormField id="liability-type" label="Type" required error={errors.type}>
-          <select
-            id="liability-type"
-            className={inputClass}
-            value={values.type}
-            onChange={(e) => set('type', e.target.value)}
-            aria-invalid={!!errors.type}
-          >
+          <select {...field('type', 'liability-type')} value={values.type} onChange={(e) => set('type', e.target.value)}>
             <option value="">Choose…</option>
             {LIABILITY_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -125,13 +144,7 @@ export function LiabilityForm({ liability, members, onSubmit, onCancel }: Liabil
         </FormField>
 
         <FormField id="liability-owner" label="Owed by" required error={errors.ownerId}>
-          <select
-            id="liability-owner"
-            className={inputClass}
-            value={values.ownerId}
-            onChange={(e) => set('ownerId', e.target.value)}
-            aria-invalid={!!errors.ownerId}
-          >
+          <select {...field('ownerId', 'liability-owner')} value={values.ownerId} onChange={(e) => set('ownerId', e.target.value)}>
             <option value="">Choose member…</option>
             {ownerOptions.map((m) => (
               <option key={m.id} value={m.id}>
@@ -143,35 +156,98 @@ export function LiabilityForm({ liability, members, onSubmit, onCancel }: Liabil
         </FormField>
       </div>
 
-      <FormField
-        id="liability-outstanding"
-        label="Outstanding amount (₹)"
-        required
-        error={errors.currentOutstanding}
-        hint={amountHint ?? 'What is still owed today'}
-      >
-        <input
+      <div className="grid gap-4 sm:grid-cols-2">
+        <FormField
           id="liability-outstanding"
-          inputMode="decimal"
-          className={inputClass}
-          value={values.currentOutstanding}
-          onChange={(e) => set('currentOutstanding', e.target.value)}
-          aria-invalid={!!errors.currentOutstanding}
-        />
-      </FormField>
+          label="Outstanding amount (₹)"
+          required
+          error={errors.currentOutstanding}
+          hint={amountHint(values.currentOutstanding) ?? 'What is still owed today'}
+        >
+          <input
+            {...field('currentOutstanding', 'liability-outstanding')}
+            inputMode="decimal"
+            value={values.currentOutstanding}
+            onChange={(e) => set('currentOutstanding', e.target.value)}
+          />
+        </FormField>
+        <FormField
+          id="liability-original"
+          label="Original amount (₹)"
+          error={errors.originalAmount}
+          hint={amountHint(values.originalAmount) ?? 'Optional: the amount borrowed'}
+        >
+          <input
+            {...field('originalAmount', 'liability-original')}
+            inputMode="decimal"
+            value={values.originalAmount}
+            onChange={(e) => set('originalAmount', e.target.value)}
+          />
+        </FormField>
+      </div>
+
+      <fieldset className="rounded-lg border border-slate-200 p-4 dark:border-slate-800">
+        <legend className="px-1 text-sm font-medium text-slate-700 dark:text-slate-200">Repayment</legend>
+        <p className="mb-3 text-xs text-slate-500 dark:text-slate-400">
+          Optional. Add the interest rate and either the EMI or the months left to see the repayment schedule.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField id="liability-rate" label="Interest rate (% a year)" error={errors.interestRate}>
+            <input
+              {...field('interestRate', 'liability-rate')}
+              inputMode="decimal"
+              value={values.interestRate}
+              onChange={(e) => set('interestRate', e.target.value)}
+            />
+          </FormField>
+          <FormField id="liability-emi" label="Monthly EMI (₹)" error={errors.monthlyEMI} hint={amountHint(values.monthlyEMI)}>
+            <input
+              {...field('monthlyEMI', 'liability-emi')}
+              inputMode="decimal"
+              value={values.monthlyEMI}
+              onChange={(e) => set('monthlyEMI', e.target.value)}
+            />
+          </FormField>
+          <FormField
+            id="liability-months"
+            label="Remaining months"
+            error={errors.remainingMonths}
+            hint="Used to work out the EMI when it is left blank"
+          >
+            <input
+              {...field('remainingMonths', 'liability-months')}
+              inputMode="numeric"
+              value={values.remainingMonths}
+              onChange={(e) => set('remainingMonths', e.target.value)}
+            />
+          </FormField>
+          <FormField id="liability-start" label="Start date" error={errors.startDate} hint="Optional">
+            <input
+              {...field('startDate', 'liability-start')}
+              type="date"
+              value={values.startDate}
+              onChange={(e) => set('startDate', e.target.value)}
+            />
+          </FormField>
+        </div>
+        {preview?.kind === 'schedule' && preview.months > 0 && (
+          <p data-testid="loan-preview" className="mt-3 rounded-lg bg-teal-50 px-3 py-2 text-sm text-teal-900 dark:bg-teal-950 dark:text-teal-100">
+            {preview.emiCalculated && <>EMI {formatINRExact(preview.emi)} · </>}
+            Debt-free by {formatMonth(debtFreeMonth(preview.months, todayISODate()))} ({preview.months} months) · Total
+            interest {formatINRExact(preview.totalInterest)}
+          </p>
+        )}
+      </fieldset>
 
       <FormField id="liability-notes" label="Notes" hint="Optional" error={errors.notes}>
         <textarea
-          id="liability-notes"
+          {...field('notes', 'liability-notes')}
           rows={2}
-          className={inputClass}
           value={values.notes}
           onChange={(e) => set('notes', e.target.value)}
           maxLength={1000}
         />
       </FormField>
-
-      <p className="text-xs text-slate-500 dark:text-slate-400">Interest rate, EMI and repayment schedule come in a later update.</p>
 
       {saveError && (
         <p role="alert" className="text-sm text-red-600 dark:text-red-400">

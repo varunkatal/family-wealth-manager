@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSettings } from '../app/SettingsContext';
-import { DemoBadge } from '../components/Badge';
+import { Badge, DemoBadge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -8,12 +8,20 @@ import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { DemoDataBanner } from '../features/demo/DemoDataBanner';
 import { LiabilityForm } from '../features/liabilities/LiabilityForm';
+import { LoanDetails } from '../features/liabilities/LoanDetails';
 import { useWealthData } from '../hooks/useWealthData';
 import type { Liability } from '../models/liability';
 import { createLiability, deleteLiability, updateLiability } from '../services/storage/liabilityRepository';
+import { analyseLoan, debtFreeMonth } from '../services/finance/loans';
 import { formatINR } from '../utils/currency';
+import { formatMonth, todayISODate } from '../utils/date';
 
-type Dialog = { kind: 'add' } | { kind: 'edit'; liability: Liability } | { kind: 'delete'; liability: Liability } | null;
+type Dialog =
+  | { kind: 'add' }
+  | { kind: 'details'; liability: Liability }
+  | { kind: 'edit'; liability: Liability }
+  | { kind: 'delete'; liability: Liability }
+  | null;
 
 export function LiabilitiesPage() {
   const { members, assets, liabilities, memberById, wealth, loading, error, run } = useWealthData();
@@ -23,6 +31,11 @@ export function LiabilitiesPage() {
   const fmt = (n: number) => formatINR(n, settings.numberFormat);
   const close = () => setDialog(null);
   const demoCount = [...members, ...assets, ...liabilities].filter((r) => r.isDemo).length;
+  const today = todayISODate();
+  const loans = liabilities.map((l) => ({ liability: l, analysis: analyseLoan(l) }));
+  const totalEMI = loans.reduce((s, { analysis: a }) => s + (a.kind === 'schedule' && a.months > 0 ? a.emi : 0), 0);
+  const lastMonths = Math.max(0, ...loans.map(({ analysis: a }) => (a.kind === 'schedule' ? a.months : 0)));
+  const allPlanned = loans.every(({ analysis: a }) => a.kind === 'schedule');
 
   return (
     <>
@@ -62,6 +75,17 @@ export function LiabilitiesPage() {
             <span className="font-semibold text-slate-900 dark:text-slate-100" data-testid="liabilities-total">
               {fmt(wealth.totalLiabilities)}
             </span>
+            {totalEMI > 0 && (
+              <>
+                {' '}
+                · EMIs{' '}
+                <span className="font-semibold text-slate-900 dark:text-slate-100" data-testid="total-emi">
+                  {fmt(Math.round(totalEMI * 100) / 100)}
+                </span>{' '}
+                a month
+              </>
+            )}
+            {allPlanned && lastMonths > 0 && <> · Debt-free by {formatMonth(debtFreeMonth(lastMonths, today))}</>}
           </p>
           <Card padded={false} className="overflow-hidden">
             <table className="w-full text-left text-sm">
@@ -69,6 +93,8 @@ export function LiabilitiesPage() {
                 <tr>
                   <th scope="col" className="px-4 py-3 font-medium">Liability</th>
                   <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Owed by</th>
+                  <th scope="col" className="hidden px-4 py-3 text-right font-medium md:table-cell">EMI</th>
+                  <th scope="col" className="hidden px-4 py-3 font-medium lg:table-cell">Debt-free</th>
                   <th scope="col" className="px-4 py-3 text-right font-medium">Outstanding</th>
                   <th scope="col" className="w-0 px-4 py-3">
                     <span className="sr-only">Actions</span>
@@ -76,10 +102,16 @@ export function LiabilitiesPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {liabilities.map((l) => (
+                {loans.map(({ liability: l, analysis: a }) => (
                   <tr key={l.id}>
                     <td className="px-4 py-3">
-                      <span className="font-medium">{l.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setDialog({ kind: 'details', liability: l })}
+                        className="text-left font-medium hover:text-teal-700 hover:underline dark:hover:text-teal-400"
+                      >
+                        {l.name}
+                      </button>
                       {l.isDemo && (
                         <span className="ml-2">
                           <DemoBadge />
@@ -92,6 +124,27 @@ export function LiabilitiesPage() {
                     </td>
                     <td className="hidden px-4 py-3 text-slate-600 sm:table-cell dark:text-slate-300">
                       {memberById.get(l.ownerId)?.name ?? 'Unknown'}
+                    </td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 text-right tabular-nums md:table-cell">
+                      {a.kind === 'schedule' && a.months > 0 ? (
+                        <>
+                          {fmt(a.emi)}
+                          {l.interestRate !== undefined && (
+                            <div className="text-xs text-slate-500 dark:text-slate-400">at {l.interestRate}%</div>
+                          )}
+                        </>
+                      ) : (
+                        '—'
+                      )}
+                    </td>
+                    <td className="hidden whitespace-nowrap px-4 py-3 lg:table-cell">
+                      {a.kind === 'schedule' && a.months > 0 ? (
+                        formatMonth(debtFreeMonth(a.months, today))
+                      ) : a.kind === 'never-repaid' ? (
+                        <Badge tone="warning">Never repaid</Badge>
+                      ) : (
+                        <span className="text-slate-400">—</span>
+                      )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-right font-medium tabular-nums">{fmt(l.currentOutstanding)}</td>
                     <td className="whitespace-nowrap px-2 py-2 text-right">
@@ -111,7 +164,7 @@ export function LiabilitiesPage() {
       )}
 
       {dialog?.kind === 'add' && (
-        <Modal title="Add liability" onClose={close}>
+        <Modal title="Add liability" onClose={close} size="lg">
           <LiabilityForm
             members={members}
             onCancel={close}
@@ -123,8 +176,20 @@ export function LiabilitiesPage() {
         </Modal>
       )}
 
+      {dialog?.kind === 'details' && (
+        <Modal title={dialog.liability.name} onClose={close} size="lg">
+          <LoanDetails liability={dialog.liability} fmt={fmt} ownerName={memberById.get(dialog.liability.ownerId)?.name ?? 'Unknown'} />
+          <div className="mt-6 flex justify-end gap-2">
+            <Button variant="secondary" onClick={() => setDialog({ kind: 'edit', liability: dialog.liability })}>
+              Edit
+            </Button>
+            <Button onClick={close}>Close</Button>
+          </div>
+        </Modal>
+      )}
+
       {dialog?.kind === 'edit' && (
-        <Modal title="Edit liability" onClose={close}>
+        <Modal title="Edit liability" onClose={close} size="lg">
           <LiabilityForm
             liability={dialog.liability}
             members={members}

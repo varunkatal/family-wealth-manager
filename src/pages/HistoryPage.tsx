@@ -37,7 +37,8 @@ const pct = (p: number | null) => (p === null ? '—' : `${p >= 0 ? '+' : ''}${p
 const axis = (n: number) => formatINRCompact(n).replace(' Lakh', 'L').replace(' Crore', 'Cr');
 
 export function HistoryPage() {
-  const { assets, snapshots, valuations, wealth, loading, error, run } = useWealthData();
+  const { assets, liabilities, snapshots, valuations, wealth, loading, error, run } = useWealthData();
+  const nothingToSave = assets.length === 0 && liabilities.length === 0;
   const { settings } = useSettings();
   const fmt = (n: number) => formatINR(n, settings.numberFormat);
   const signed = (n: number | null) => (n === null ? '—' : `${n >= 0 ? '+' : ''}${fmt(n)}`);
@@ -73,7 +74,9 @@ export function HistoryPage() {
           <Button variant="secondary" onClick={() => setDialog({ kind: 'add-snapshot' })}>
             Add past snapshot
           </Button>
-          <Button onClick={() => void save()}>Save wealth snapshot</Button>
+          <Button onClick={() => void save()} disabled={loading || nothingToSave} title={nothingToSave ? 'Add assets or liabilities first' : undefined}>
+            Save wealth snapshot
+          </Button>
         </div>
       </div>
 
@@ -106,7 +109,7 @@ export function HistoryPage() {
                 <dl className="flex flex-wrap gap-x-10 gap-y-3 text-sm">
                   <div>
                     <dt className="text-slate-500 dark:text-slate-400">Latest snapshot · {formatISODate(latest.item.date)}</dt>
-                    <dd className="text-3xl font-semibold tabular-nums" data-testid="latest-net-worth">
+                    <dd className="text-2xl font-semibold tabular-nums [overflow-wrap:anywhere] sm:text-3xl" data-testid="latest-net-worth">
                       {fmt(latest.item.netWorth)}
                     </dd>
                   </div>
@@ -147,14 +150,14 @@ export function HistoryPage() {
               <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
                 <Card padded={false} className="overflow-hidden">
                   <h2 className="px-5 pt-5 font-semibold">Snapshots</h2>
-                  <div className="mt-3 overflow-x-auto">
+                  <div className="relative mt-3 overflow-x-auto">
                     <table className="w-full text-sm">
                       <caption className="sr-only">Snapshots</caption>
                       <thead className="border-y border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-400">
                         <tr>
                           <th scope="col" className="px-4 py-2.5 text-left font-medium">Date</th>
-                          <th scope="col" className="hidden px-2 py-2.5 text-right font-medium md:table-cell">Assets</th>
-                          <th scope="col" className="hidden px-2 py-2.5 text-right font-medium md:table-cell">Liabilities</th>
+                          <th scope="col" className="hidden px-2 py-2.5 text-right font-medium lg:table-cell">Assets</th>
+                          <th scope="col" className="hidden px-2 py-2.5 text-right font-medium lg:table-cell">Liabilities</th>
                           <th scope="col" className="px-2 py-2.5 text-right font-medium">Net worth</th>
                           <th scope="col" className="hidden px-2 py-2.5 text-right font-medium sm:table-cell">Change</th>
                           <th scope="col" className="w-0 px-2 py-2.5">
@@ -172,8 +175,8 @@ export function HistoryPage() {
                                 {s.isDemo && <Badge tone="demo">Demo</Badge>}
                               </div>
                             </th>
-                            <td className="hidden whitespace-nowrap px-2 py-2.5 text-right tabular-nums md:table-cell">{fmt(s.totalAssets)}</td>
-                            <td className="hidden whitespace-nowrap px-2 py-2.5 text-right tabular-nums md:table-cell">{fmt(s.totalLiabilities)}</td>
+                            <td className="hidden whitespace-nowrap px-2 py-2.5 text-right tabular-nums lg:table-cell">{fmt(s.totalAssets)}</td>
+                            <td className="hidden whitespace-nowrap px-2 py-2.5 text-right tabular-nums lg:table-cell">{fmt(s.totalLiabilities)}</td>
                             <td className="whitespace-nowrap px-2 py-2.5 text-right font-medium tabular-nums">{fmt(s.netWorth)}</td>
                             <td className="hidden whitespace-nowrap px-2 py-2.5 text-right tabular-nums sm:table-cell">
                               {signed(change)}
@@ -282,48 +285,50 @@ export function HistoryPage() {
                     />
                   </div>
                 )}
-                <table className="mt-4 w-full text-sm">
-                  <caption className="sr-only">{selectedAsset.name} value history</caption>
-                  <thead className="text-xs text-slate-500 dark:text-slate-400">
-                    <tr>
-                      <th scope="col" className="pb-1 text-left font-normal">Date</th>
-                      <th scope="col" className="pb-1 text-right font-normal">Value</th>
-                      <th scope="col" className="pb-1 text-right font-normal">Change</th>
-                      <th scope="col" className="hidden pb-1 pl-3 text-left font-normal sm:table-cell">Source</th>
-                      <th scope="col" className="w-0 pb-1">
-                        <span className="sr-only">Actions</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {[...assetRows].reverse().map(({ item: v, change, percentage }) => (
-                      <tr key={v.id} className="border-t border-slate-100 dark:border-slate-800">
-                        <th scope="row" className="whitespace-nowrap py-1.5 text-left font-normal">{formatISODate(v.date)}</th>
-                        <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmt(v.value)}</td>
-                        <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
-                          {signed(change)} <span className="text-xs text-slate-500 dark:text-slate-400">{pct(percentage)}</span>
-                        </td>
-                        <td className="hidden py-1.5 pl-3 text-slate-600 sm:table-cell dark:text-slate-300">
-                          {VALUATION_SOURCES[v.source]}
-                          {v.notes && <span className="block text-xs text-slate-500 dark:text-slate-400">{v.notes}</span>}
-                        </td>
-                        <td className="whitespace-nowrap py-1 text-right">
-                          {v.source === 'manual' && (
-                            <Button
-                              variant="danger-ghost"
-                              aria-label={`Delete value of ${formatISODate(v.date)}`}
-                              onClick={() =>
-                                setDialog({ kind: 'delete', title: 'Delete value?', label: `The value recorded for ${formatISODate(v.date)}`, remove: () => deleteValuation(v.id) })
-                              }
-                            >
-                              Delete
-                            </Button>
-                          )}
-                        </td>
+                <div className="relative mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <caption className="sr-only">{selectedAsset.name} value history</caption>
+                    <thead className="text-xs text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th scope="col" className="pb-1 text-left font-normal">Date</th>
+                        <th scope="col" className="pb-1 text-right font-normal">Value</th>
+                        <th scope="col" className="pb-1 text-right font-normal">Change</th>
+                        <th scope="col" className="hidden pb-1 pl-3 text-left font-normal sm:table-cell">Source</th>
+                        <th scope="col" className="w-0 pb-1">
+                          <span className="sr-only">Actions</span>
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {[...assetRows].reverse().map(({ item: v, change, percentage }) => (
+                        <tr key={v.id} className="border-t border-slate-100 dark:border-slate-800">
+                          <th scope="row" className="whitespace-nowrap py-1.5 text-left font-normal">{formatISODate(v.date)}</th>
+                          <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{fmt(v.value)}</td>
+                          <td className="whitespace-nowrap py-1.5 text-right tabular-nums">
+                            {signed(change)} <span className="text-xs text-slate-500 dark:text-slate-400">{pct(percentage)}</span>
+                          </td>
+                          <td className="hidden py-1.5 pl-3 text-slate-600 sm:table-cell dark:text-slate-300">
+                            {VALUATION_SOURCES[v.source]}
+                            {v.notes && <span className="block text-xs text-slate-500 dark:text-slate-400">{v.notes}</span>}
+                          </td>
+                          <td className="whitespace-nowrap py-1 text-right">
+                            {v.source === 'manual' && (
+                              <Button
+                                variant="danger-ghost"
+                                aria-label={`Delete value of ${formatISODate(v.date)}`}
+                                onClick={() =>
+                                  setDialog({ kind: 'delete', title: 'Delete value?', label: `The value recorded for ${formatISODate(v.date)}`, remove: () => deleteValuation(v.id) })
+                                }
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </>
             )}
           </Card>

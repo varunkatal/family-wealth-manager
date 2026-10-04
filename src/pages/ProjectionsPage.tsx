@@ -191,7 +191,7 @@ export function ProjectionsPage() {
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
                   Family assets in {years} {years === 1 ? 'year' : 'years'} ({currentYear + years}) · {scenarioName}
                 </p>
-                <p data-testid="projected-total" className="mt-1 text-5xl font-semibold tracking-tight">
+                <p data-testid="projected-total" className="mt-1 text-4xl font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-5xl">
                   {fmt(nominalFinal)}
                 </p>
                 <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-slate-100 pt-4 text-sm dark:border-slate-800">
@@ -247,7 +247,7 @@ export function ProjectionsPage() {
                     />
                   </div>
                 )}
-                <div className="mt-4 overflow-x-auto">
+                <div className="relative mt-4 overflow-x-auto">
                   <table className="w-full text-sm">
                     <caption className="sr-only">Scenario comparison</caption>
                     <thead className="text-xs text-slate-500 dark:text-slate-400">

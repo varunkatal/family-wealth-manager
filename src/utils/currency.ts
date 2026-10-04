@@ -37,3 +37,9 @@ export function parseAmountInput(text: string): number | undefined {
   if (cleaned === '') return undefined;
   return /^-?\d*\.?\d+$/.test(cleaned) ? Number(cleaned) : Number.NaN;
 }
+
+/** A share of a total, e.g. "12.5%". Tiny non-zero shares show as "<0.1%" rather than a misleading "0.0%". */
+export function formatShare(percentage: number): string {
+  if (percentage > 0 && percentage < 0.05) return '<0.1%';
+  return `${percentage.toFixed(1)}%`;
+}

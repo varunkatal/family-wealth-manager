@@ -19,7 +19,7 @@ import {
   calculateMemberAllocation,
   calculateTopAssets,
 } from '../services/finance/allocation';
-import { formatINR } from '../utils/currency';
+import { formatINR, formatShare } from '../utils/currency';
 
 export function DashboardPage() {
   const { members, assets, ownerships, liabilities, wealth, loading, error, run } = useWealthData();
@@ -45,7 +45,7 @@ export function DashboardPage() {
         <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Net worth</p>
         <p
           data-testid="net-worth"
-          className={`mt-1 text-5xl font-semibold tracking-tight ${loading ? 'text-slate-300 dark:text-slate-600' : wealth.netWorth < 0 ? 'text-red-600 dark:text-red-400' : ''}`}
+          className={`mt-1 text-4xl font-semibold tracking-tight [overflow-wrap:anywhere] sm:text-5xl ${loading ? 'text-slate-300 dark:text-slate-600' : wealth.netWorth < 0 ? 'text-red-600 dark:text-red-400' : ''}`}
         >
           {loading ? '—' : fmt(wealth.netWorth)}
         </p>
@@ -145,7 +145,7 @@ function DashboardCharts({ data, fmt }: { data: Data; fmt: (n: number) => string
   ]);
 
   return (
-    <div className="mt-6 grid gap-6 lg:grid-cols-2">
+    <div className="mt-6 grid gap-6 lg:grid-cols-2 [&>*]:min-w-0">
       <ChartCard title="Asset allocation" subtitle="Family-owned value by asset class">
         {allocation.length === 0 ? (
           <Empty>No owned assets yet.</Empty>
@@ -175,7 +175,7 @@ function DashboardCharts({ data, fmt }: { data: Data; fmt: (n: number) => string
         )}
       </ChartCard>
 
-      <ChartCard title="Liquid vs illiquid" subtitle={allocation.length ? `${liquidShare.toFixed(1)}% of assets can be turned into cash within days` : undefined}>
+      <ChartCard title="Liquid vs illiquid" subtitle={allocation.length ? `${formatShare(liquidShare)} of assets can be turned into cash within days` : undefined}>
         {liquidity.length === 0 ? (
           <Empty>No owned assets yet.</Empty>
         ) : (
@@ -203,32 +203,34 @@ function DashboardCharts({ data, fmt }: { data: Data; fmt: (n: number) => string
               color="var(--series-1)"
               items={shownMembers.map((m) => ({ key: m.id, label: m.name, value: wealthById.get(m.id)?.netWorth ?? 0 }))}
             />
-            <table className="mt-5 w-full text-sm">
-              <caption className="sr-only">Wealth by family member</caption>
-              <thead className="text-xs text-slate-500 dark:text-slate-400">
-                <tr>
-                  <th scope="col" className="pb-1 text-left font-normal">Member</th>
-                  <th scope="col" className="pb-1 text-right font-normal">Assets</th>
-                  <th scope="col" className="hidden pb-1 text-right font-normal sm:table-cell">Liabilities</th>
-                  <th scope="col" className="pb-1 text-right font-normal">Net worth</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shownMembers.map((m) => {
-                  const w = wealthById.get(m.id);
-                  return (
-                    <tr key={m.id} className="border-t border-slate-100 dark:border-slate-800">
-                      <th scope="row" className="py-1.5 pr-2 text-left font-normal">{m.name}</th>
-                      <td className="py-1.5 text-right tabular-nums">{fmt(w?.assets ?? 0)}</td>
-                      <td className="hidden py-1.5 text-right tabular-nums sm:table-cell">{fmt(w?.liabilities ?? 0)}</td>
-                      <td className={`py-1.5 text-right font-medium tabular-nums ${(w?.netWorth ?? 0) < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
-                        {fmt(w?.netWorth ?? 0)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <div className="relative mt-5 overflow-x-auto">
+              <table className="w-full text-sm">
+                <caption className="sr-only">Wealth by family member</caption>
+                <thead className="text-xs text-slate-500 dark:text-slate-400">
+                  <tr>
+                    <th scope="col" className="pb-1 text-left font-normal">Member</th>
+                    <th scope="col" className="pb-1 text-right font-normal">Assets</th>
+                    <th scope="col" className="hidden pb-1 text-right font-normal sm:table-cell">Liabilities</th>
+                    <th scope="col" className="pb-1 text-right font-normal">Net worth</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {shownMembers.map((m) => {
+                    const w = wealthById.get(m.id);
+                    return (
+                      <tr key={m.id} className="border-t border-slate-100 dark:border-slate-800">
+                        <th scope="row" className="py-1.5 pr-2 text-left font-normal">{m.name}</th>
+                        <td className="py-1.5 text-right tabular-nums">{fmt(w?.assets ?? 0)}</td>
+                        <td className="hidden py-1.5 text-right tabular-nums sm:table-cell">{fmt(w?.liabilities ?? 0)}</td>
+                        <td className={`py-1.5 text-right font-medium tabular-nums ${(w?.netWorth ?? 0) < 0 ? 'text-red-600 dark:text-red-400' : ''}`}>
+                          {fmt(w?.netWorth ?? 0)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </>
         )}
       </ChartCard>
@@ -298,7 +300,7 @@ function DashboardCharts({ data, fmt }: { data: Data; fmt: (n: number) => string
                     </span>
                   </th>
                   <td className="py-1.5 text-right tabular-nums">{fmt(familyValue)}</td>
-                  <td className="py-1.5 text-right tabular-nums text-slate-500 dark:text-slate-400">{percentage.toFixed(1)}%</td>
+                  <td className="py-1.5 text-right tabular-nums text-slate-500 dark:text-slate-400">{formatShare(percentage)}</td>
                 </tr>
               ))}
             </tbody>

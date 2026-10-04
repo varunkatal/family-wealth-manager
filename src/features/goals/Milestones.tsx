@@ -63,7 +63,7 @@ export function Milestones({ netWorthByScenario, today, assetsMissingRates }: Mi
         </p>
       </div>
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="relative mt-4 overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">Wealth milestones</caption>
           <thead className="text-xs text-slate-500 dark:text-slate-400">

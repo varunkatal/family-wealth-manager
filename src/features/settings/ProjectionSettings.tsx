@@ -97,7 +97,7 @@ export function ProjectionSettings({ settings, assetClasses, onSave }: Props) {
         <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
           Used only for assets that have no rate of their own for that scenario. Leave blank for no default.
         </p>
-        <div className="mt-3 overflow-x-auto">
+        <div className="relative mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <caption className="sr-only">Default growth rates by asset class</caption>
             <thead className="text-xs text-slate-500 dark:text-slate-400">

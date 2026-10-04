@@ -1,4 +1,5 @@
 import { useChartTooltip } from './useChartTooltip';
+import { formatShare } from '../../utils/currency';
 
 export type BarSegment = { key: string; label: string; value: number; percentage: number; color: string };
 
@@ -13,7 +14,8 @@ type StackedBarProps = {
   tooltip?: ReturnType<typeof useChartTooltip>;
 };
 
-const pct = (n: number) => `${n.toFixed(n > 0 && n < 1 ? 1 : 0)}%`;
+// Whole % on bars (1 decimal under 1%); tiny non-zero shares use the shared "<0.1%" form.
+const pct = (n: number) => (n > 0 && n < 0.05 ? formatShare(n) : `${n.toFixed(n > 0 && n < 1 ? 1 : 0)}%`);
 
 /**
  * One horizontal bar split into segments (≤ 24px thick, 2px surface gaps,

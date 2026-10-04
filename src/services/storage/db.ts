@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Asset } from '../../models/asset';
+import type { Expense, Income } from '../../models/cashFlow';
 import type { Contribution } from '../../models/contribution';
 import type { FamilyMember } from '../../models/familyMember';
 import type { Liability } from '../../models/liability';
@@ -7,7 +8,7 @@ import type { AssetOwnership } from '../../models/ownership';
 import type { AppSettings } from '../../models/settings';
 
 export const DB_NAME = 'family-wealth-calculator';
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 
 export interface WealthDB extends DBSchema {
   settings: {
@@ -36,6 +37,16 @@ export interface WealthDB extends DBSchema {
     key: string;
     value: Contribution;
     indexes: { 'by-owner': string; 'by-asset': string };
+  };
+  incomes: {
+    key: string;
+    value: Income;
+    indexes: { 'by-member': string };
+  };
+  expenses: {
+    key: string;
+    value: Expense;
+    indexes: { 'by-member': string };
   };
 }
 
@@ -66,6 +77,10 @@ export function getDb(): Promise<IDBPDatabase<WealthDB>> {
           const contributions = db.createObjectStore('contributions', { keyPath: 'id' });
           contributions.createIndex('by-owner', 'ownerId');
           contributions.createIndex('by-asset', 'linkedAssetId');
+        }
+        if (oldVersion < 6) {
+          db.createObjectStore('incomes', { keyPath: 'id' }).createIndex('by-member', 'memberId');
+          db.createObjectStore('expenses', { keyPath: 'id' }).createIndex('by-member', 'memberId');
         }
       },
       // Another tab is upgrading the database: release our connection so it can proceed.

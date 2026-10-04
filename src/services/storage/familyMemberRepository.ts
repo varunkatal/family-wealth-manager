@@ -46,9 +46,9 @@ export async function updateFamilyMember(id: string, input: FamilyMemberInput): 
 }
 
 /** Records that belong to a member and would be orphaned if the member were deleted. */
-export type MemberHoldings = { assets: number; liabilities: number; contributions: number };
+export type MemberHoldings = { assets: number; liabilities: number; contributions: number; incomes: number; expenses: number };
 
-const HOLDING_STORES = ['assetOwnerships', 'liabilities', 'contributions'] as const;
+const HOLDING_STORES = ['assetOwnerships', 'liabilities', 'contributions', 'incomes', 'expenses'] as const;
 
 export const totalHoldings = (h: MemberHoldings) => Object.values(h).reduce((s, n) => s + n, 0);
 
@@ -63,12 +63,14 @@ export class MemberHasHoldingsError extends Error {
 type HoldingsTx = IDBPTransaction<WealthDB, ('familyMembers' | (typeof HOLDING_STORES)[number])[], IDBTransactionMode>;
 
 async function countIn(tx: HoldingsTx, id: string): Promise<MemberHoldings> {
-  const [assets, liabilities, contributions] = await Promise.all([
+  const [assets, liabilities, contributions, incomes, expenses] = await Promise.all([
     tx.objectStore('assetOwnerships').index('by-member').count(id),
     tx.objectStore('liabilities').index('by-owner').count(id),
     tx.objectStore('contributions').index('by-owner').count(id),
+    tx.objectStore('incomes').index('by-member').count(id),
+    tx.objectStore('expenses').index('by-member').count(id),
   ]);
-  return { assets, liabilities, contributions };
+  return { assets, liabilities, contributions, incomes, expenses };
 }
 
 /** Number of asset shares, liabilities and other records that belong to a member. */

@@ -33,16 +33,18 @@ type Dialog =
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-function describeHoldings({ assets, liabilities, contributions }: MemberHoldings): string {
+function describeHoldings({ assets, liabilities, contributions, incomes, expenses }: MemberHoldings): string {
   const parts: string[] = [];
   if (assets > 0) parts.push(`co-owns ${plural(assets, 'asset')}`);
   if (liabilities > 0) parts.push(`owes ${liabilities} ${liabilities === 1 ? 'liability' : 'liabilities'}`);
   if (contributions > 0) parts.push(`makes ${plural(contributions, 'regular investment')}`);
+  if (incomes > 0) parts.push(`has ${plural(incomes, 'income')}`);
+  if (expenses > 0) parts.push(`has ${plural(expenses, 'expense')}`);
   return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts.join('');
 }
 
 export function FamilyPage() {
-  const { members, assets, ownerships, liabilities, contributions, wealth, loading, error, run } = useWealthData();
+  const { members, assets, ownerships, liabilities, contributions, incomes, expenses, wealth, loading, error, run } = useWealthData();
   const { settings } = useSettings();
   const fmt = (n: number) => formatINR(n, settings.numberFormat);
   const wealthById = new Map(wealth.byMember.map((w) => [w.memberId, w]));
@@ -50,6 +52,8 @@ export function FamilyPage() {
     assets: ownerships.filter((o) => o.familyMemberId === id).length,
     liabilities: liabilities.filter((l) => l.ownerId === id).length,
     contributions: contributions.filter((c) => c.ownerId === id).length,
+    incomes: incomes.filter((i) => i.memberId === id).length,
+    expenses: expenses.filter((e) => e.memberId === id).length,
   });
   const demoCount = [...members, ...assets, ...liabilities].filter((r) => r.isDemo).length;
   const requestDelete = (member: FamilyMember) => {

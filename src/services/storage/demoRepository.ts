@@ -5,7 +5,7 @@ import type { DemoData } from '../demo/demoData';
 import { unlinkContributions } from './assetRepository';
 import { getDb } from './db';
 
-const DEMO_STORES = ['familyMembers', 'assets', 'assetOwnerships', 'liabilities', 'contributions'] as const;
+const DEMO_STORES = ['familyMembers', 'assets', 'assetOwnerships', 'liabilities', 'contributions', 'incomes', 'expenses'] as const;
 
 /** Adds demo members, assets (with owners) and liabilities in one transaction, all marked as demo. */
 export async function loadDemoData(data: DemoData): Promise<void> {
@@ -48,7 +48,7 @@ export type ClearDemoResult = { assets: number; liabilities: number; members: nu
 
 /**
  * Removes demo assets (and their ownership records), demo liabilities, and demo members.
- * A demo member who now owns one of the user's own assets, liabilities or contributions is kept and becomes a
+ * A demo member who now owns one of the user's own assets, liabilities, investments, income or expenses is kept and becomes a
  * regular member (the demo label is removed), so real data is never orphaned. The caller reports this.
  */
 export async function clearDemoData(): Promise<ClearDemoResult> {
@@ -75,7 +75,9 @@ export async function clearDemoData(): Promise<ClearDemoResult> {
     const stillOwns =
       (await ownershipStore.index('by-member').count(member.id)) +
       (await liabilityStore.index('by-owner').count(member.id)) +
-      (await contributionStore.index('by-owner').count(member.id));
+      (await contributionStore.index('by-owner').count(member.id)) +
+      (await tx.objectStore('incomes').index('by-member').count(member.id)) +
+      (await tx.objectStore('expenses').index('by-member').count(member.id));
     if (stillOwns > 0) {
       const { isDemo: _dropped, ...regular } = member;
       await memberStore.put({ ...regular, updatedAt: new Date().toISOString() });

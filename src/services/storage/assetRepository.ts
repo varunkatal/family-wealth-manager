@@ -1,6 +1,6 @@
 import { assetInputSchema, assetSchema, type Asset, type AssetInput } from '../../models/asset';
 import { assetOwnershipSchema, type AssetOwnership } from '../../models/ownership';
-import type { IDBPObjectStore, IDBPTransaction } from 'idb';
+import type { IDBPObjectStore, IDBPTransaction, StoreNames } from 'idb';
 import { getDb, type WealthDB } from './db';
 
 /** All valid stored assets, highest current value first. */
@@ -109,7 +109,7 @@ export async function deleteAsset(id: string): Promise<void> {
   });
 }
 
-type ContributionStore = IDBPObjectStore<WealthDB, ('contributions' | 'assets' | 'assetOwnerships' | 'familyMembers' | 'liabilities')[], 'contributions', 'readwrite'>;
+type ContributionStore = IDBPObjectStore<WealthDB, StoreNames<WealthDB>[], 'contributions', 'readwrite'>;
 
 /** Removes the link from every contribution that points at an asset. */
 export async function unlinkContributions(store: ContributionStore, assetId: string): Promise<void> {

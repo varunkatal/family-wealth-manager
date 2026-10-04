@@ -13,6 +13,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/assets', label: 'Assets', icon: 'assets' },
   { to: '/liabilities', label: 'Liabilities', icon: 'liabilities' },
   { to: '/investments', label: 'Investments', icon: 'investments' },
+  { to: '/cash-flow', label: 'Cash flow', icon: 'cashflow' },
   { to: '/projections', label: 'Projections', icon: 'projections' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];

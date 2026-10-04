@@ -1,4 +1,4 @@
-export type IconName = 'dashboard' | 'family' | 'assets' | 'liabilities' | 'investments' | 'projections' | 'settings' | 'menu' | 'close';
+export type IconName = 'dashboard' | 'family' | 'assets' | 'liabilities' | 'investments' | 'cashflow' | 'projections' | 'settings' | 'menu' | 'close';
 
 const PATHS: Record<IconName, string> = {
   dashboard: 'M3 13h8V3H3v10Zm0 8h8v-6H3v6Zm10 0h8V11h-8v10Zm0-18v6h8V3h-8Z',
@@ -10,6 +10,8 @@ const PATHS: Record<IconName, string> = {
     'M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Zm2 2v2h14V8H5Zm2 5v2h4v-2H7Z',
   investments:
     'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm1 15v1.5h-2V17a3.5 3.5 0 0 1-2.8-2.4l1.9-.6c.2.7.9 1.2 1.9 1.2h1c.8 0 1.3-.4 1.3-1s-.5-1-1.3-1h-2a3 3 0 0 1 0-6V5.5h2V7a3.3 3.3 0 0 1 2.7 2.2l-1.9.6c-.2-.5-.7-.8-1.3-.8h-1.5c-.7 0-1.2.4-1.2 1s.5 1 1.2 1h2a3 3 0 0 1 0 6Z',
+  cashflow:
+    'M7 4h2v12.2l2.6-2.6L13 15l-5 5-5-5 1.4-1.4L7 16.2V4Zm8 16h2V7.8l2.6 2.6L21 9l-5-5-5 5 1.4 1.4L15 7.8V20Z',
   projections:
     'M3 19h18v2H3v-2Zm1.3-4.7 5-5 3.5 3.5L18 7.6V11h2V4h-7v2h3.6l-4.8 4.8-3.5-3.5-6.4 6.4 1.4 1.4Z',
   settings:

@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Asset } from '../models/asset';
+import type { Expense, Income } from '../models/cashFlow';
 import type { Contribution } from '../models/contribution';
 import type { FamilyMember } from '../models/familyMember';
 import type { Liability } from '../models/liability';
 import type { AssetOwnership } from '../models/ownership';
 import { calculateFamilyWealth, type FamilyWealth } from '../services/finance/netWorth';
 import { listAssets, listOwnerships } from '../services/storage/assetRepository';
+import { listExpenses, listIncomes } from '../services/storage/cashFlowRepository';
 import { listContributions } from '../services/storage/contributionRepository';
 import { listFamilyMembers } from '../services/storage/familyMemberRepository';
 import { listLiabilities } from '../services/storage/liabilityRepository';
@@ -16,9 +18,11 @@ type WealthData = {
   ownerships: AssetOwnership[];
   liabilities: Liability[];
   contributions: Contribution[];
+  incomes: Income[];
+  expenses: Expense[];
 };
 
-const EMPTY: WealthData = { members: [], assets: [], ownerships: [], liabilities: [], contributions: [] };
+const EMPTY: WealthData = { members: [], assets: [], ownerships: [], liabilities: [], contributions: [], incomes: [], expenses: [] };
 
 /**
  * Loads all wealth records together and derives totals from them,
@@ -31,14 +35,16 @@ export function useWealthData() {
 
   const reload = useCallback(async () => {
     try {
-      const [members, assets, ownerships, liabilities, contributions] = await Promise.all([
+      const [members, assets, ownerships, liabilities, contributions, incomes, expenses] = await Promise.all([
         listFamilyMembers(),
         listAssets(),
         listOwnerships(),
         listLiabilities(),
         listContributions(),
+        listIncomes(),
+        listExpenses(),
       ]);
-      setData({ members, assets, ownerships, liabilities, contributions });
+      setData({ members, assets, ownerships, liabilities, contributions, incomes, expenses });
       setError(null);
     } catch {
       setError('Could not load your data.');

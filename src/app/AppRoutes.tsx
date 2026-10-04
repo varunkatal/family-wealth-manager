@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import { AssetsPage } from '../pages/AssetsPage';
+import { CashFlowPage } from '../pages/CashFlowPage';
 import { ContributionsPage } from '../pages/ContributionsPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { FamilyPage } from '../pages/FamilyPage';
@@ -18,6 +19,7 @@ export function AppRoutes() {
         <Route path="assets" element={<AssetsPage />} />
         <Route path="liabilities" element={<LiabilitiesPage />} />
         <Route path="investments" element={<ContributionsPage />} />
+        <Route path="cash-flow" element={<CashFlowPage />} />
         <Route path="projections" element={<ProjectionsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />

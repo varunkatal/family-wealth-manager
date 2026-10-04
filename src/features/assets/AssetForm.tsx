@@ -11,9 +11,12 @@ import {
   type ValuationMethod,
 } from '../../models/asset';
 import { getAssetClassOptions, getSubcategoryOptions } from '../../models/assetCategories';
+import type { FamilyMember } from '../../models/familyMember';
+import type { AssetOwnership } from '../../models/ownership';
 import { calculateQuantityValue } from '../../services/finance/assetValuation';
 import { formatINRCompact, formatINRExact, parseAmountInput } from '../../utils/currency';
 import { todayISODate } from '../../utils/date';
+import { defaultOwnerRows, OwnershipFields, parsePercent, type OwnerRow } from './OwnershipFields';
 
 const CUSTOM = '__custom__';
 
@@ -66,9 +69,7 @@ function toFormValues(asset?: Asset): FormValues {
   };
 }
 
-const parsePercent = (text: string) => parseAmountInput(text.replace('%', ''));
-
-function toInput(v: FormValues): AssetInput {
+function toInput(v: FormValues, owners: OwnerRow[]): AssetInput {
   return {
     name: v.name,
     assetClass: v.classChoice === CUSTOM ? v.customClass : v.classChoice,
@@ -86,8 +87,14 @@ function toInput(v: FormValues): AssetInput {
     optimisticGrowthRate: parsePercent(v.optimisticGrowthRate),
     liquidity: v.liquidity as Liquidity,
     notes: v.notes,
+    owners: owners.map((o) => ({ familyMemberId: o.memberId, percentage: parsePercent(o.percentage) as number })),
   };
 }
+
+const validAmount = (text: string) => {
+  const n = parseAmountInput(text);
+  return n === undefined || Number.isNaN(n) ? undefined : n;
+};
 
 /** "₹10,00,000 · ₹10 Lakh" under an amount field, so large numbers are easy to check. */
 function amountHint(text: string): string | undefined {
@@ -101,12 +108,20 @@ function amountHint(text: string): string | undefined {
 type AssetFormProps = {
   asset?: Asset;
   existingAssets: Asset[];
+  members: FamilyMember[];
+  /** Ownership records of the asset being edited. */
+  ownerships?: AssetOwnership[];
   onSubmit: (input: AssetInput) => Promise<void>;
   onCancel: () => void;
 };
 
-export function AssetForm({ asset, existingAssets, onSubmit, onCancel }: AssetFormProps) {
+export function AssetForm({ asset, existingAssets, members, ownerships = [], onSubmit, onCancel }: AssetFormProps) {
   const [values, setValues] = useState<FormValues>(() => toFormValues(asset));
+  const [owners, setOwners] = useState<OwnerRow[]>(() =>
+    ownerships.length > 0
+      ? ownerships.map((o) => ({ memberId: o.familyMemberId, percentage: String(o.percentage) }))
+      : defaultOwnerRows(members),
+  );
   const [errors, setErrors] = useState<FieldErrors>({});
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -134,7 +149,7 @@ export function AssetForm({ asset, existingAssets, onSubmit, onCancel }: AssetFo
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (saving) return;
-    const input = toInput(values);
+    const input = toInput(values, owners);
     const parsed = assetInputSchema.safeParse(input);
     if (!parsed.success) {
       const fieldErrors: FieldErrors = {};
@@ -349,6 +364,23 @@ export function AssetForm({ asset, existingAssets, onSubmit, onCancel }: AssetFo
             />
           </FormField>
         </div>
+      </Section>
+
+      <Section title="Ownership" description="Who owns this asset, and in what share. Shares can total less than 100% if part is owned outside the family.">
+        <OwnershipFields
+          rows={owners}
+          onChange={(rows) => {
+            setOwners(rows);
+            setErrors((e) => {
+              const next = { ...e };
+              delete next.owners;
+              return next;
+            });
+          }}
+          members={members}
+          assetValue={values.valuationMethod === 'manual' ? validAmount(values.currentValue) : computedValue}
+          error={errors.owners}
+        />
       </Section>
 
       <Section title="Expected annual growth" description="Optional. Your own assumptions, used for projections in later steps.">

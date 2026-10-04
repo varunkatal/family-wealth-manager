@@ -2,6 +2,7 @@ import { Route, Routes } from 'react-router-dom';
 import { AssetsPage } from '../pages/AssetsPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { FamilyPage } from '../pages/FamilyPage';
+import { LiabilitiesPage } from '../pages/LiabilitiesPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { Layout } from './Layout';
@@ -13,6 +14,7 @@ export function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="family" element={<FamilyPage />} />
         <Route path="assets" element={<AssetsPage />} />
+        <Route path="liabilities" element={<LiabilitiesPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

@@ -27,7 +27,7 @@ export function filterAssets(assets: Asset[], f: AssetFilters): Asset[] {
     name: (a, b) => a.name.localeCompare(b.name),
     updated: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
   };
-  return result.sort(compare[f.sort]);
+  return result.sort((a, b) => compare[f.sort](a, b) || a.name.localeCompare(b.name));
 }
 
 export function hasActiveFilters(f: AssetFilters): boolean {

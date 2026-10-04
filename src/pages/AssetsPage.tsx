@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useSettings } from '../app/SettingsContext';
+import { DemoBadge, Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -8,11 +9,15 @@ import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { AssetDetails } from '../features/assets/AssetDetails';
 import { AssetForm } from '../features/assets/AssetForm';
+import { DemoDataBanner } from '../features/demo/DemoDataBanner';
 import { EMPTY_FILTERS, filterAssets, hasActiveFilters, type AssetFilters, type AssetSort } from '../features/assets/filterAssets';
-import { useAssets } from '../hooks/useAssets';
+import { useWealthData } from '../hooks/useWealthData';
 import { LIQUIDITY_OPTIONS, liquidityLabel, type Asset, type Liquidity } from '../models/asset';
 import { getAssetClassOptions } from '../models/assetCategories';
 import { sumCurrentValues } from '../services/finance/assetValuation';
+import { buildDemoData } from '../services/demo/demoData';
+import { createAsset, deleteAsset, updateAsset } from '../services/storage/assetRepository';
+import { loadDemoData } from '../services/storage/demoRepository';
 import { formatINR } from '../utils/currency';
 import { formatISODate } from '../utils/date';
 
@@ -21,7 +26,6 @@ type Dialog =
   | { kind: 'view'; asset: Asset }
   | { kind: 'edit'; asset: Asset }
   | { kind: 'delete'; asset: Asset }
-  | { kind: 'clear-demo' }
   | null;
 
 const SORT_OPTIONS: { value: AssetSort; label: string }[] = [
@@ -32,23 +36,33 @@ const SORT_OPTIONS: { value: AssetSort; label: string }[] = [
 ];
 
 export function AssetsPage() {
-  const { assets, loading, error, create, update, remove, loadDemo, clearDemo } = useAssets();
+  const { assets, ownerships, members, liabilities, memberById, wealth, loading, error, run } = useWealthData();
   const { settings } = useSettings();
   const [filters, setFilters] = useState<AssetFilters>(EMPTY_FILTERS);
   const [dialog, setDialog] = useState<Dialog>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
   const visible = filterAssets(assets, filters);
-  const demoCount = assets.filter((a) => a.isDemo).length;
+  const demoCount = [...members, ...assets, ...liabilities].filter((r) => r.isDemo).length;
+  const unowned = new Set(wealth.unownedAssetIds);
+  // Stable display order: largest share first, then by name.
+  const ownersOf = (assetId: string) =>
+    ownerships
+      .filter((o) => o.assetId === assetId)
+      .sort(
+        (a, b) =>
+          b.percentage - a.percentage ||
+          (memberById.get(a.familyMemberId)?.name ?? '').localeCompare(memberById.get(b.familyMemberId)?.name ?? ''),
+      );
   const classOptions = getAssetClassOptions(assets);
   const fmt = (n: number) => formatINR(n, settings.numberFormat);
   const close = () => setDialog(null);
   const setFilter = <K extends keyof AssetFilters>(key: K, value: AssetFilters[K]) =>
     setFilters((f) => ({ ...f, [key]: value }));
 
-  const attempt = async (action: () => Promise<void>, message: string) => {
+  const attempt = async (action: () => Promise<unknown>, message: string) => {
     try {
-      await action();
+      await run(action);
       setActionError(null);
     } catch {
       setActionError(message);
@@ -72,16 +86,16 @@ export function AssetsPage() {
         </p>
       )}
 
-      {demoCount > 0 && (
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
-          <span>
-            Includes <strong>{demoCount}</strong> demo {demoCount === 1 ? 'asset' : 'assets'}. This is fake data for
-            trying the app.
-          </span>
-          <Button variant="secondary" onClick={() => setDialog({ kind: 'clear-demo' })}>
-            Clear demo data
-          </Button>
-        </div>
+      <DemoDataBanner demoCount={demoCount} run={run} />
+
+      {unowned.size > 0 && (
+        <p role="status" className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 dark:border-red-900 dark:bg-red-950 dark:text-red-200">
+          <strong>
+            {unowned.size} {unowned.size === 1 ? 'asset has' : 'assets have'} no owner
+          </strong>{' '}
+          and {unowned.size === 1 ? "isn't" : "aren't"} counted in net worth. Open {unowned.size === 1 ? 'it' : 'each one'}{' '}
+          and assign an owner.
+        </p>
       )}
 
       {loading ? (
@@ -90,13 +104,13 @@ export function AssetsPage() {
         <Card className="py-10 text-center">
           <h2 className="font-medium">No assets yet</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">
-            Add investments, property, gold, deposits and cash. You can also load clearly labelled demo data to try
-            things out, then clear it in one click.
+            Add investments, property, gold, deposits and cash. You can also load clearly labelled demo data (two demo
+            family members with assets and a loan) to try things out, then clear it in one click.
           </p>
           <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
             <Button onClick={() => setDialog({ kind: 'add' })}>Add your first asset</Button>
-            <Button variant="secondary" onClick={() => void attempt(loadDemo, 'Could not load demo data.')}>
-              Load demo assets
+            <Button variant="secondary" onClick={() => void attempt(() => loadDemoData(buildDemoData()), 'Could not load demo data.')}>
+              Load demo data
             </Button>
           </div>
         </Card>
@@ -155,7 +169,7 @@ export function AssetsPage() {
             {visible.length === assets.length
               ? `${assets.length} ${assets.length === 1 ? 'asset' : 'assets'}`
               : `Showing ${visible.length} of ${assets.length} assets`}{' '}
-            · Current value{' '}
+            · Total value{' '}
             <span className="font-semibold text-slate-900 dark:text-slate-100" data-testid="visible-total">
               {fmt(sumCurrentValues(visible))}
             </span>
@@ -176,6 +190,7 @@ export function AssetsPage() {
                 <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500 dark:border-slate-800 dark:bg-slate-800/50 dark:text-slate-400">
                   <tr>
                     <th scope="col" className="px-4 py-3 font-medium">Asset</th>
+                    <th scope="col" className="hidden px-4 py-3 font-medium sm:table-cell">Owners</th>
                     <th scope="col" className="hidden px-4 py-3 font-medium md:table-cell">Liquidity</th>
                     <th scope="col" className="hidden px-4 py-3 font-medium lg:table-cell">Valued on</th>
                     <th scope="col" className="px-4 py-3 text-right font-medium">Current value</th>
@@ -193,13 +208,23 @@ export function AssetsPage() {
                           {a.name}
                         </button>
                         {a.isDemo && (
-                          <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-semibold uppercase text-amber-800 dark:bg-amber-900 dark:text-amber-200">
-                            Demo
+                          <span className="ml-2">
+                            <DemoBadge />
+                          </span>
+                        )}
+                        {unowned.has(a.id) && (
+                          <span className="ml-2">
+                            <Badge tone="warning">No owner</Badge>
                           </span>
                         )}
                         <div className="text-xs text-slate-500 dark:text-slate-400">
                           {[a.assetClass, a.subcategory, a.institution].filter(Boolean).join(' · ')}
                         </div>
+                      </td>
+                      <td className="hidden px-4 py-3 text-slate-600 sm:table-cell dark:text-slate-300">
+                        {ownersOf(a.id)
+                          .map((o) => `${memberById.get(o.familyMemberId)?.name ?? 'Unknown'} ${o.percentage}%`)
+                          .join(', ') || '—'}
                       </td>
                       <td className="hidden px-4 py-3 text-slate-600 md:table-cell dark:text-slate-300">
                         {liquidityLabel(a.liquidity)}
@@ -221,9 +246,10 @@ export function AssetsPage() {
         <Modal title="Add asset" onClose={close} size="lg">
           <AssetForm
             existingAssets={assets}
+            members={members}
             onCancel={close}
             onSubmit={async (input) => {
-              await create(input);
+              await run(() => createAsset(input));
               close();
             }}
           />
@@ -234,6 +260,8 @@ export function AssetsPage() {
         <Modal title={dialog.asset.name} onClose={close} size="lg">
           <AssetDetails
             asset={dialog.asset}
+            ownerships={ownersOf(dialog.asset.id)}
+            memberById={memberById}
             onEdit={() => setDialog({ kind: 'edit', asset: dialog.asset })}
             onDelete={() => setDialog({ kind: 'delete', asset: dialog.asset })}
           />
@@ -245,9 +273,11 @@ export function AssetsPage() {
           <AssetForm
             asset={dialog.asset}
             existingAssets={assets}
+            members={members}
+            ownerships={ownersOf(dialog.asset.id)}
             onCancel={close}
             onSubmit={async (input) => {
-              await update(dialog.asset.id, input);
+              await run(() => updateAsset(dialog.asset.id, input));
               close();
             }}
           />
@@ -266,24 +296,12 @@ export function AssetsPage() {
           confirmLabel="Delete"
           onCancel={close}
           onConfirm={async () => {
-            await attempt(() => remove(dialog.asset.id), 'Could not delete the asset.');
+            await attempt(() => deleteAsset(dialog.asset.id), 'Could not delete the asset.');
             close();
           }}
         />
       )}
 
-      {dialog?.kind === 'clear-demo' && (
-        <ConfirmDialog
-          title="Clear demo data?"
-          message={<p>All {demoCount} demo assets will be removed. Assets you added yourself are not affected.</p>}
-          confirmLabel="Clear demo data"
-          onCancel={close}
-          onConfirm={async () => {
-            await attempt(clearDemo, 'Could not clear demo data.');
-            close();
-          }}
-        />
-      )}
     </>
   );
 }

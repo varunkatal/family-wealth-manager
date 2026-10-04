@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AppRoutes } from '../app/AppRoutes';
 import { SettingsProvider } from '../app/SettingsContext';
-import { closeDb } from '../services/storage/db';
+import { closeDb, getDb } from '../services/storage/db';
+import { createFamilyMember } from '../services/storage/familyMemberRepository';
 import { saveSettings } from '../services/storage/settingsRepository';
 
 type User = ReturnType<typeof userEvent.setup>;
@@ -24,18 +25,27 @@ const rowNames = () =>
     .slice(1)
     .map((r) => within(r).getAllByRole('button')[0]!.textContent);
 
-async function addManualAsset(user: User, opts: { name: string; cls: string; value: string; liquidity: string; open: RegExp }) {
+async function addManualAsset(
+  user: User,
+  opts: { name: string; cls: string; value: string; liquidity: string; open: RegExp; owner?: string },
+) {
   await user.click(await screen.findByRole('button', { name: opts.open }));
   const dialog = screen.getByRole('dialog', { name: 'Add asset' });
   await user.type(within(dialog).getByLabelText(/Asset name/), opts.name);
   await user.selectOptions(within(dialog).getByLabelText(/Asset class/), opts.cls);
   await user.type(within(dialog).getByLabelText(/Current value/), opts.value);
   await user.click(within(dialog).getByRole('radio', { name: new RegExp(`^${opts.liquidity}`) }));
+  if (opts.owner) await user.selectOptions(within(dialog).getByLabelText('Owner 1'), opts.owner);
   await user.click(within(dialog).getByRole('button', { name: 'Add asset' }));
   await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
 }
 
 describe('Assets page', () => {
+  // Every asset needs an owner; with a single active member the form pre-selects them at 100%.
+  beforeEach(async () => {
+    await createFamilyMember({ name: 'Me', relationship: 'Self', isActive: true });
+  });
+
   it('creates, views, edits, searches, filters and deletes assets, and persists them', async () => {
     const user = userEvent.setup();
     const { unmount } = renderAssets();
@@ -53,7 +63,7 @@ describe('Assets page', () => {
     await user.click(within(dialog).getByRole('radio', { name: 'Quantity × price' }));
     await user.type(within(dialog).getByRole('textbox', { name: /^Quantity/ }), '100');
     await user.type(within(dialog).getByLabelText(/Price per unit/), '10000');
-    expect(within(dialog).getByText('₹10,00,000')).toBeInTheDocument();
+    expect(within(dialog).getByText(/Current value:/)).toHaveTextContent('₹10,00,000');
     await user.click(within(dialog).getByRole('radio', { name: /^Semi-liquid/ }));
     await user.click(within(dialog).getByRole('button', { name: 'Add asset' }));
     await waitFor(() => expect(rowNames()).toEqual(['Example Gold', 'Example FD']));
@@ -131,21 +141,82 @@ describe('Assets page', () => {
   it('loads demo data, labels it, and clears only demo data', async () => {
     const user = userEvent.setup();
     renderAssets();
-    await addManualAsset(user, { name: 'My FD', cls: 'Fixed Income', value: '100000', liquidity: 'Semi-liquid', open: /Add your first asset/ });
-
-    // The "Load demo" button is on the empty state, so clear and re-add order: delete then load
-    await user.click(screen.getByRole('button', { name: 'My FD' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
-    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Delete' }));
-    await user.click(await screen.findByRole('button', { name: 'Load demo assets' }));
+    await user.click(await screen.findByRole('button', { name: 'Load demo data' }));
     await waitFor(() => expect(rowNames()).toHaveLength(4));
     expect(screen.getAllByText('Demo')).toHaveLength(4);
-    expect(screen.getByText(/Includes/)).toHaveTextContent('Includes 4 demo assets');
+    expect(screen.getByText(/Demo data is loaded/)).toBeInTheDocument();
+    expect(screen.getByRole('cell', { name: 'Person A 50%, Person B 50%' })).toBeInTheDocument();
 
-    await addManualAsset(user, { name: 'My FD', cls: 'Fixed Income', value: '100000', liquidity: 'Semi-liquid', open: /^Add asset$/ });
+    await addManualAsset(user, { name: 'My FD', cls: 'Fixed Income', value: '100000', liquidity: 'Semi-liquid', open: /^Add asset$/, owner: 'Me' });
     await user.click(screen.getByRole('button', { name: 'Clear demo data' }));
     await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Clear demo data' }));
     await waitFor(() => expect(rowNames()).toEqual(['My FD']));
+    expect(screen.getByRole('status')).toHaveTextContent('Demo data cleared.');
+  });
+
+  it('assigns joint ownership and validates shares', async () => {
+    await createFamilyMember({ name: 'Person B', relationship: 'Spouse', isActive: true });
+    const user = userEvent.setup();
+    renderAssets();
+    await user.click(await screen.findByRole('button', { name: /Add your first asset/ }));
+    let dialog = screen.getByRole('dialog', { name: 'Add asset' });
+    await user.type(within(dialog).getByLabelText(/Asset name/), 'Example Property');
+    await user.selectOptions(within(dialog).getByLabelText(/Asset class/), 'Real Estate');
+    await user.type(within(dialog).getByLabelText(/Current value/), '1,00,00,000');
+    await user.click(within(dialog).getByRole('radio', { name: /^Illiquid/ }));
+
+    // Two members, so no owner is pre-selected
+    await user.click(within(dialog).getByRole('button', { name: 'Add asset' }));
+    expect(within(dialog).getByText('Choose a family member for each owner')).toBeInTheDocument();
+
+    await user.selectOptions(within(dialog).getByLabelText('Owner 1'), 'Me');
+    await user.click(within(dialog).getByRole('button', { name: 'Add owner' }));
+    expect(within(dialog).getByLabelText('Owner 2')).toHaveDisplayValue('Person B');
+    const share1 = within(dialog).getByLabelText('Owner 1 share %');
+    const share2 = within(dialog).getByLabelText('Owner 2 share %');
+    await user.clear(share2);
+    await user.type(share2, '50');
+    await user.click(within(dialog).getByRole('button', { name: 'Add asset' }));
+    expect(within(dialog).getByText('Shares add up to 150%, which is more than 100%')).toBeInTheDocument();
+
+    await user.clear(share1);
+    await user.type(share1, '60');
+    await user.clear(share2);
+    await user.type(share2, '40');
+    expect(within(dialog).getByText('₹60,00,000')).toBeInTheDocument(); // live preview of A's share
+    await user.click(within(dialog).getByRole('button', { name: 'Add asset' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByRole('cell', { name: 'Me 60%, Person B 40%' })).toBeInTheDocument();
+
+    // Details show each owner's attributed value; split equally on edit
+    await user.click(screen.getByRole('button', { name: 'Example Property' }));
+    dialog = screen.getByRole('dialog', { name: 'Example Property' });
+    expect(within(dialog).getByText(/Me · 60% ·/)).toHaveTextContent('₹60,00,000');
+    expect(within(dialog).getByText(/Person B · 40% ·/)).toHaveTextContent('₹40,00,000');
+    await user.click(within(dialog).getByRole('button', { name: 'Edit' }));
+    dialog = screen.getByRole('dialog', { name: 'Edit asset' });
+    await user.click(within(dialog).getByRole('button', { name: 'Split equally' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Save changes' }));
+    await waitFor(() => expect(screen.getByRole('cell', { name: 'Me 50%, Person B 50%' })).toBeInTheDocument());
+  });
+
+  it('flags an asset saved without an owner and leaves it out of net worth', async () => {
+    const db = await getDb();
+    const now = new Date().toISOString();
+    await db.add('assets', {
+      id: 'legacy',
+      name: 'Old Asset',
+      assetClass: 'Cash',
+      valuationMethod: 'manual',
+      currentValue: 1000,
+      valuationDate: '2026-01-01',
+      liquidity: 'liquid',
+      createdAt: now,
+      updatedAt: now,
+    });
+    renderAssets();
+    expect(await screen.findByText('No owner')).toBeInTheDocument();
+    expect(screen.getByText(/1 asset has no owner/)).toBeInTheDocument();
   });
 
   it('uses the lakh/crore number format when chosen in Settings', async () => {

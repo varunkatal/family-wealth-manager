@@ -14,7 +14,7 @@ export async function listFamilyMembers(): Promise<FamilyMember[]> {
     .map((row) => familyMemberSchema.safeParse(row))
     .filter((r) => r.success)
     .map((r) => r.data)
-    .sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.createdAt.localeCompare(b.createdAt));
+    .sort((a, b) => Number(b.isActive) - Number(a.isActive) || a.createdAt.localeCompare(b.createdAt) || a.name.localeCompare(b.name));
 }
 
 export async function createFamilyMember(input: FamilyMemberInput): Promise<FamilyMember> {
@@ -35,6 +35,7 @@ export async function updateFamilyMember(id: string, input: FamilyMemberInput): 
   const updated: FamilyMember = {
     id,
     ...fields,
+    ...(existing.isDemo && { isDemo: true }),
     createdAt: existing.createdAt,
     updatedAt: new Date().toISOString(),
   };
@@ -43,7 +44,43 @@ export async function updateFamilyMember(id: string, input: FamilyMemberInput): 
   return updated;
 }
 
+/** Thrown when deleting a member who still owns assets or owes liabilities. */
+export class MemberHasHoldingsError extends Error {
+  constructor(
+    readonly assetCount: number,
+    readonly liabilityCount: number,
+  ) {
+    super('This family member still owns assets or liabilities');
+    this.name = 'MemberHasHoldingsError';
+  }
+}
+
+/** Number of assets a member co-owns and liabilities they owe. */
+export async function countMemberHoldings(id: string): Promise<{ assets: number; liabilities: number }> {
+  const db = await getDb();
+  const [assets, liabilities] = await Promise.all([
+    db.countFromIndex('assetOwnerships', 'by-member', id),
+    db.countFromIndex('liabilities', 'by-owner', id),
+  ]);
+  return { assets, liabilities };
+}
+
+/**
+ * Deletes a member. Refuses if they own any asset share or liability, so their share
+ * can never silently drop out of net worth; those must be reassigned first.
+ */
 export async function deleteFamilyMember(id: string): Promise<void> {
   const db = await getDb();
-  await db.delete('familyMembers', id);
+  const tx = db.transaction(['familyMembers', 'assetOwnerships', 'liabilities'], 'readwrite');
+  const [assets, liabilities] = await Promise.all([
+    tx.objectStore('assetOwnerships').index('by-member').count(id),
+    tx.objectStore('liabilities').index('by-owner').count(id),
+  ]);
+  if (assets > 0 || liabilities > 0) {
+    tx.abort();
+    await tx.done.catch(() => undefined);
+    throw new MemberHasHoldingsError(assets, liabilities);
+  }
+  await tx.objectStore('familyMembers').delete(id);
+  await tx.done;
 }

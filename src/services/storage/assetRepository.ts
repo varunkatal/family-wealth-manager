@@ -1,5 +1,7 @@
 import { assetInputSchema, assetSchema, type Asset, type AssetInput } from '../../models/asset';
-import { getDb } from './db';
+import { assetOwnershipSchema, type AssetOwnership } from '../../models/ownership';
+import type { IDBPTransaction } from 'idb';
+import { getDb, type WealthDB } from './db';
 
 /** All valid stored assets, highest current value first. */
 export async function listAssets(): Promise<Asset[]> {
@@ -9,59 +11,96 @@ export async function listAssets(): Promise<Asset[]> {
     .map((row) => assetSchema.safeParse(row))
     .filter((r) => r.success)
     .map((r) => r.data)
-    .sort((a, b) => b.currentValue - a.currentValue);
+    .sort((a, b) => b.currentValue - a.currentValue || a.name.localeCompare(b.name));
 }
 
-function buildAsset(input: AssetInput, isDemo: boolean): Asset {
-  const fields = assetInputSchema.parse(input);
-  const now = new Date().toISOString();
-  return { id: crypto.randomUUID(), ...fields, ...(isDemo && { isDemo: true }), createdAt: now, updatedAt: now };
+/** All valid ownership records. */
+export async function listOwnerships(): Promise<AssetOwnership[]> {
+  const db = await getDb();
+  const rows = await db.getAll('assetOwnerships');
+  return rows
+    .map((row) => assetOwnershipSchema.safeParse(row))
+    .filter((r) => r.success)
+    .map((r) => r.data);
+}
+
+type ParsedAsset = ReturnType<typeof assetInputSchema.parse>;
+
+function splitInput(input: AssetInput): { fields: Omit<ParsedAsset, 'owners'>; owners: ParsedAsset['owners'] } {
+  const { owners, ...fields } = assetInputSchema.parse(input);
+  return { fields, owners };
+}
+
+const TX_STORES = ['assets', 'assetOwnerships', 'familyMembers'] as const;
+type AssetTx = IDBPTransaction<WealthDB, typeof TX_STORES extends readonly (infer S)[] ? S[] : never, 'readwrite'>;
+
+/** Writes the asset and replaces its ownership records, inside one transaction. */
+async function writeAssetWithOwners(tx: AssetTx, asset: Asset, owners: ParsedAsset['owners'], isNew: boolean) {
+  const members = tx.objectStore('familyMembers');
+  const ownerships = tx.objectStore('assetOwnerships');
+  for (const o of owners) {
+    if (!(await members.get(o.familyMemberId))) throw new Error('Owner not found');
+  }
+  if (isNew) await tx.objectStore('assets').add(asset);
+  else await tx.objectStore('assets').put(asset);
+  for (const key of await ownerships.index('by-asset').getAllKeys(asset.id)) await ownerships.delete(key);
+  for (const o of owners) {
+    await ownerships.add({ id: crypto.randomUUID(), assetId: asset.id, ...o });
+  }
+}
+
+async function inTransaction<T>(work: (tx: AssetTx) => Promise<T>): Promise<T> {
+  const db = await getDb();
+  const tx = db.transaction([...TX_STORES], 'readwrite');
+  try {
+    const result = await work(tx);
+    await tx.done;
+    return result;
+  } catch (err) {
+    // Roll back everything written so far; nothing is half-saved.
+    try {
+      tx.abort();
+    } catch {
+      // already finished
+    }
+    await tx.done.catch(() => undefined);
+    throw err;
+  }
 }
 
 export async function createAsset(input: AssetInput): Promise<Asset> {
-  const asset = buildAsset(input, false);
-  const db = await getDb();
-  await db.add('assets', asset); // `add` fails rather than overwrite if the ID already exists
-  return asset;
+  const { fields, owners } = splitInput(input);
+  const now = new Date().toISOString();
+  const asset: Asset = { id: crypto.randomUUID(), ...fields, createdAt: now, updatedAt: now };
+  // `add` fails rather than overwrite if the ID already exists.
+  return inTransaction(async (tx) => {
+    await writeAssetWithOwners(tx, asset, owners, true);
+    return asset;
+  });
 }
 
 export async function updateAsset(id: string, input: AssetInput): Promise<Asset> {
-  const fields = assetInputSchema.parse(input);
-  const db = await getDb();
-  const tx = db.transaction('assets', 'readwrite');
-  const existing = await tx.store.get(id);
-  if (!existing) throw new Error('Asset not found');
-  const updated: Asset = {
-    id,
-    ...fields,
-    ...(existing.isDemo && { isDemo: true }),
-    createdAt: existing.createdAt,
-    updatedAt: new Date().toISOString(),
-  };
-  await tx.store.put(updated);
-  await tx.done;
-  return updated;
+  const { fields, owners } = splitInput(input);
+  return inTransaction(async (tx) => {
+    const existing = await tx.objectStore('assets').get(id);
+    if (!existing) throw new Error('Asset not found');
+    const updated: Asset = {
+      id,
+      ...fields,
+      ...(existing.isDemo && { isDemo: true }),
+      createdAt: existing.createdAt,
+      updatedAt: new Date().toISOString(),
+    };
+    await writeAssetWithOwners(tx, updated, owners, false);
+    return updated;
+  });
 }
 
+/** Deletes an asset together with its ownership records. */
 export async function deleteAsset(id: string): Promise<void> {
-  const db = await getDb();
-  await db.delete('assets', id);
-}
-
-/** Adds the given demo assets, all marked as demo data, in one transaction. */
-export async function addDemoAssets(inputs: AssetInput[]): Promise<Asset[]> {
-  const assets = inputs.map((input) => buildAsset(input, true));
-  const db = await getDb();
-  const tx = db.transaction('assets', 'readwrite');
-  await Promise.all([...assets.map((a) => tx.store.add(a)), tx.done]);
-  return assets;
-}
-
-/** Deletes every asset marked as demo data and nothing else. Returns how many were removed. */
-export async function deleteDemoAssets(): Promise<number> {
-  const db = await getDb();
-  const tx = db.transaction('assets', 'readwrite');
-  const demoIds = (await tx.store.getAll()).filter((a) => a.isDemo === true).map((a) => a.id);
-  await Promise.all([...demoIds.map((id) => tx.store.delete(id)), tx.done]);
-  return demoIds.length;
+  await inTransaction(async (tx) => {
+    const ownerships = tx.objectStore('assetOwnerships');
+    for (const key of await ownerships.index('by-asset').getAllKeys(id)) await ownerships.delete(key);
+    await tx.objectStore('assets').delete(id);
+  });
 }

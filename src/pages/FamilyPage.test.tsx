@@ -95,3 +95,30 @@ describe('Family page', () => {
     expect(memberNames()).toEqual(['Person A']);
   });
 });
+
+describe('Family page wealth', () => {
+  it("shows each member's attributed assets, liabilities and net worth", async () => {
+    const { loadDemoData } = await import('../services/storage/demoRepository');
+    const { buildDemoData } = await import('../services/demo/demoData');
+    await loadDemoData(buildDemoData());
+    renderFamily();
+    const cardA = await screen.findByLabelText('Person A wealth');
+    expect(cardA).toHaveTextContent('Assets₹25,50,000');
+    expect(cardA).toHaveTextContent('Liabilities₹2,00,000');
+    expect(cardA).toHaveTextContent('Net worth₹23,50,000');
+    expect(screen.getByLabelText('Person B wealth')).toHaveTextContent('Net worth₹19,50,000');
+  });
+
+  it('blocks deleting a member who still owns something, and explains why', async () => {
+    const { loadDemoData } = await import('../services/storage/demoRepository');
+    const { buildDemoData } = await import('../services/demo/demoData');
+    await loadDemoData(buildDemoData());
+    const user = userEvent.setup();
+    renderFamily();
+    await user.click(await screen.findByRole('button', { name: 'Delete Person B' }));
+    const dialog = screen.getByRole('alertdialog', { name: "Can't delete yet" });
+    expect(dialog).toHaveTextContent('Person B co-owns 3 assets');
+    await user.click(within(dialog).getByRole('button', { name: 'OK' }));
+    expect(memberNames()).toContain('Person B');
+  });
+});

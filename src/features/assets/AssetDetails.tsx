@@ -1,6 +1,9 @@
 import type { ReactNode } from 'react';
 import { Button } from '../../components/Button';
 import { liquidityLabel, type Asset } from '../../models/asset';
+import type { FamilyMember } from '../../models/familyMember';
+import type { AssetOwnership } from '../../models/ownership';
+import { calculateFamilySharePercentage, calculateOwnershipValue } from '../../services/finance/netWorth';
 import { formatINRCompact, formatINRExact } from '../../utils/currency';
 import { formatISODate } from '../../utils/date';
 
@@ -13,11 +16,40 @@ const amount = (n: number) => (
 
 const rate = (n: number | undefined) => (n === undefined ? 'Not set' : `${n}%`);
 
-export function AssetDetails({ asset, onEdit, onDelete }: { asset: Asset; onEdit: () => void; onDelete: () => void }) {
+type AssetDetailsProps = {
+  asset: Asset;
+  ownerships: AssetOwnership[];
+  memberById: Map<string, FamilyMember>;
+  onEdit: () => void;
+  onDelete: () => void;
+};
+
+export function AssetDetails({ asset, ownerships, memberById, onEdit, onDelete }: AssetDetailsProps) {
+  const familyShare = calculateFamilySharePercentage(asset.id, ownerships);
+  const ownership: ReactNode =
+    ownerships.length === 0 ? (
+      <span className="font-medium text-red-700 dark:text-red-400">No owner. Not counted in net worth until one is assigned.</span>
+    ) : (
+      <ul className="space-y-0.5">
+        {ownerships.map((o) => (
+          <li key={o.id}>
+            {memberById.get(o.familyMemberId)?.name ?? 'Unknown member'} · {o.percentage}% ·{' '}
+            <span className="tabular-nums">{formatINRExact(calculateOwnershipValue(asset.currentValue, o.percentage))}</span>
+          </li>
+        ))}
+        {familyShare < 100 && (
+          <li className="text-slate-500 dark:text-slate-400">
+            Family share {familyShare}% · {Math.round((100 - familyShare) * 100) / 100}% owned outside the family
+          </li>
+        )}
+      </ul>
+    );
+
   const rows: [string, ReactNode][] = [
     ['Category', [asset.assetClass, asset.subcategory].filter(Boolean).join(' › ')],
     ['Institution', asset.institution ?? '—'],
     ['Current value', <strong key="v">{amount(asset.currentValue)}</strong>],
+    ['Owners', ownership],
     [
       'Valuation',
       asset.valuationMethod === 'quantity_x_price'

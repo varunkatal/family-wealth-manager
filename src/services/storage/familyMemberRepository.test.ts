@@ -80,3 +80,42 @@ describe('familyMemberRepository', () => {
     expect((await listFamilyMembers()).map((m) => m.name)).toEqual(['Active', 'Inactive']);
   });
 });
+
+describe('deleting a member who owns things', () => {
+  it('is refused while they own an asset share or a liability, and allowed once reassigned', async () => {
+    const { createAsset, deleteAsset } = await import('./assetRepository');
+    const { createLiability, deleteLiability } = await import('./liabilityRepository');
+    const { MemberHasHoldingsError, countMemberHoldings } = await import('./familyMemberRepository');
+    const a = await createFamilyMember({ ...base, name: 'Person A' });
+    const asset = await createAsset({
+      name: 'Example FD',
+      assetClass: 'Fixed Income',
+      valuationMethod: 'manual',
+      currentValue: 100,
+      valuationDate: '2026-01-01',
+      liquidity: 'liquid',
+      owners: [{ familyMemberId: a.id, percentage: 100 }],
+    });
+    const loan = await createLiability({ name: 'Loan', type: 'Other', ownerId: a.id, currentOutstanding: 50 });
+
+    expect(await countMemberHoldings(a.id)).toEqual({ assets: 1, liabilities: 1 });
+    const err = await deleteFamilyMember(a.id).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(MemberHasHoldingsError);
+    expect(err).toMatchObject({ assetCount: 1, liabilityCount: 1 });
+    expect(await listFamilyMembers()).toHaveLength(1);
+
+    await deleteAsset(asset.id);
+    await deleteLiability(loan.id);
+    await deleteFamilyMember(a.id);
+    expect(await listFamilyMembers()).toEqual([]);
+  });
+
+  it('keeps the demo flag when a demo member is edited', async () => {
+    const { loadDemoData } = await import('./demoRepository');
+    const { buildDemoData } = await import('../demo/demoData');
+    await loadDemoData(buildDemoData());
+    const demo = (await listFamilyMembers())[0]!;
+    const updated = await updateFamilyMember(demo.id, { ...base, name: 'Renamed' });
+    expect(updated.isDemo).toBe(true);
+  });
+});

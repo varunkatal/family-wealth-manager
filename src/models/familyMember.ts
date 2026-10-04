@@ -36,6 +36,8 @@ export const familyMemberSchema = z.object({
   dateOfBirth: z.string().optional(),
   notes: z.string().optional(),
   isActive: z.boolean(),
+  /** Fake member created with demo data; removed by "Clear demo data". */
+  isDemo: z.boolean().optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

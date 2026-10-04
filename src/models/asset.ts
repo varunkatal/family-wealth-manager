@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { calculateQuantityValue } from '../services/finance/assetValuation';
-import { optionalTextSchema, pastOrTodayDateSchema } from './common';
+import { amountSchema, optionalTextSchema, pastOrTodayDateSchema } from './common';
+import { ownersInputSchema } from './ownership';
 
 export const LIQUIDITY_OPTIONS = [
   { value: 'liquid', label: 'Liquid', hint: 'Can be converted to cash within days' },
@@ -14,20 +15,12 @@ export type Liquidity = z.infer<typeof liquiditySchema>;
 export const valuationMethodSchema = z.enum(['manual', 'quantity_x_price']);
 export type ValuationMethod = z.infer<typeof valuationMethodSchema>;
 
-const MAX_AMOUNT = 1e13; // ₹10 lakh crore: far above any household asset, guards against typos
-
-const amountSchema = (label: string) =>
-  z
-    .number({ error: `Enter a valid ${label.toLowerCase()}` })
-    .min(0, `${label} cannot be negative`)
-    .max(MAX_AMOUNT, `${label} is too large`);
-
 const growthRateSchema = z
   .number({ error: 'Enter a valid percentage' })
   .min(-100, 'Rate must be between -100% and 100%')
   .max(100, 'Rate must be between -100% and 100%');
 
-/** Fields the user edits. Numbers are already parsed from the form. */
+/** Fields the user edits, including owners. Numbers are already parsed from the form. */
 export const assetInputSchema = z
   .object({
     name: z.string().trim().min(1, 'Asset name is required').max(120, 'Name must be 120 characters or fewer'),
@@ -46,6 +39,7 @@ export const assetInputSchema = z
     optimisticGrowthRate: growthRateSchema.optional(),
     liquidity: liquiditySchema,
     notes: optionalTextSchema(1000, 'Notes'),
+    owners: ownersInputSchema,
   })
   .superRefine((v, ctx) => {
     if (v.valuationMethod === 'manual' && v.currentValue === undefined) {

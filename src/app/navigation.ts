@@ -10,5 +10,6 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: 'dashboard' },
   { to: '/family', label: 'Family', icon: 'family' },
+  { to: '/assets', label: 'Assets', icon: 'assets' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];

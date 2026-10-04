@@ -27,7 +27,7 @@ export function ConfirmDialog({ title, message, confirmLabel, onConfirm, onCance
     <Modal title={title} onClose={onCancel} role="alertdialog">
       <div className="text-sm text-slate-600 dark:text-slate-300">{message}</div>
       <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button variant="secondary" onClick={onCancel} disabled={busy}>
+        <Button variant="secondary" onClick={onCancel} disabled={busy} autoFocus>
           Cancel
         </Button>
         <Button variant="danger" onClick={() => void confirm()} disabled={busy}>

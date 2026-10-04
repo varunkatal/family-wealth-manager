@@ -1,9 +1,10 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import type { Asset } from '../../models/asset';
 import type { FamilyMember } from '../../models/familyMember';
 import type { AppSettings } from '../../models/settings';
 
 export const DB_NAME = 'family-wealth-calculator';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export interface WealthDB extends DBSchema {
   settings: {
@@ -13,6 +14,10 @@ export interface WealthDB extends DBSchema {
   familyMembers: {
     key: string;
     value: FamilyMember;
+  };
+  assets: {
+    key: string;
+    value: Asset;
   };
 }
 
@@ -28,6 +33,9 @@ export function getDb(): Promise<IDBPDatabase<WealthDB>> {
         }
         if (oldVersion < 2) {
           db.createObjectStore('familyMembers', { keyPath: 'id' });
+        }
+        if (oldVersion < 3) {
+          db.createObjectStore('assets', { keyPath: 'id' });
         }
       },
       // Another tab is upgrading the database: release our connection so it can proceed.

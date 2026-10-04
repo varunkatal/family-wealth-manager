@@ -8,9 +8,15 @@ describe('settingsRepository', () => {
   });
 
   it('saves settings and reads them back after reopening the database', async () => {
-    await saveSettings({ theme: 'dark' });
+    await saveSettings({ theme: 'dark', numberFormat: 'compact' });
     await closeDb(); // simulates a page refresh
-    expect(await getSettings()).toEqual({ theme: 'dark' });
+    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'compact' });
+  });
+
+  it('loads settings saved before a field existed, keeping stored values', async () => {
+    const db = await getDb();
+    await db.put('settings', { theme: 'dark' } as unknown as AppSettings, 'app');
+    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'exact' });
   });
 
   it('rejects invalid settings without writing them', async () => {

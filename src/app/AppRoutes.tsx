@@ -1,4 +1,5 @@
 import { Route, Routes } from 'react-router-dom';
+import { AssetsPage } from '../pages/AssetsPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { FamilyPage } from '../pages/FamilyPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -11,6 +12,7 @@ export function AppRoutes() {
       <Route element={<Layout />}>
         <Route index element={<DashboardPage />} />
         <Route path="family" element={<FamilyPage />} />
+        <Route path="assets" element={<AssetsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

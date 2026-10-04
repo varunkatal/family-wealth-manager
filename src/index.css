@@ -13,3 +13,41 @@
     @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
   }
 }
+
+/*
+ * Chart colours. Categorical slots are assigned to asset classes in a fixed order
+ * (never by rank). Validated with the dataviz palette checker against the card
+ * surfaces (#ffffff light, #0f172a dark): CVD-safe adjacent pairs in both modes.
+ * Light slots 3–5 are under 3:1 on white, so every chart also shows values as text.
+ */
+:root {
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  /* Liquidity: an ordered single-hue ramp, most liquid = strongest */
+  --liq-liquid: #104281;
+  --liq-semi: #2a78d6;
+  --liq-illiquid: #86b6ef;
+  --chart-track: #f1f5f9;
+  --chart-surface: #ffffff;
+}
+.dark {
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --liq-liquid: #9ec5f4;
+  --liq-semi: #3987e5;
+  --liq-illiquid: #1c5cab;
+  --chart-track: #1e293b;
+  --chart-surface: #0f172a;
+}

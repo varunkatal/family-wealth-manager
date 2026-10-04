@@ -20,7 +20,7 @@ export function calculateOwnershipValue(assetValue: number, percentage: number):
   return roundToPaise((assetValue * percentage) / 100);
 }
 
-function sharesByAsset(ownerships: Ownership[]): Map<string, Ownership[]> {
+export function sharesByAsset(ownerships: Ownership[]): Map<string, Ownership[]> {
   const map = new Map<string, Ownership[]>();
   for (const o of ownerships) {
     const list = map.get(o.assetId);
@@ -30,10 +30,22 @@ function sharesByAsset(ownerships: Ownership[]): Map<string, Ownership[]> {
   return map;
 }
 
+/** Sum of the given owners' shares in %, capped at 100. */
+function sumShares(owners: { percentage: number }[]): number {
+  return Math.min(
+    owners.reduce((sum, o) => sum + o.percentage, 0),
+    100,
+  );
+}
+
 /** Family share of an asset in %, capped at 100. */
 export function calculateFamilySharePercentage(assetId: string, ownerships: Ownership[]): number {
-  const total = ownerships.filter((o) => o.assetId === assetId).reduce((sum, o) => sum + o.percentage, 0);
-  return Math.min(total, 100);
+  return sumShares(ownerships.filter((o) => o.assetId === assetId));
+}
+
+/** Unrounded family-owned value of an asset, given that asset's owners. Used inside sums. */
+export function familyOwnedValueOf(currentValue: number, owners: { percentage: number }[]): number {
+  return (currentValue * sumShares(owners)) / 100;
 }
 
 /** Total Assets = sum of all family-owned asset values. */
@@ -41,8 +53,7 @@ export function calculateTotalAssets(assets: ValuedAsset[], ownerships: Ownershi
   const byAsset = sharesByAsset(ownerships);
   let total = 0;
   for (const asset of assets) {
-    const share = Math.min((byAsset.get(asset.id) ?? []).reduce((sum, o) => sum + o.percentage, 0), 100);
-    total += (asset.currentValue * share) / 100;
+    total += familyOwnedValueOf(asset.currentValue, byAsset.get(asset.id) ?? []);
   }
   return roundToPaise(total);
 }

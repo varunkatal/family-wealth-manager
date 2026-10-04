@@ -1,3 +1,5 @@
+import { monthAfter } from '../../utils/date';
+
 /**
  * Loans and amortization (spec §14, §22). Pure functions.
  * Interest is charged monthly at annual rate / 12 on the outstanding balance (reducing balance),
@@ -161,8 +163,4 @@ export function projectTotalDebtByYear(loans: LoanTerms[], years: number): numbe
 }
 
 /** YYYY-MM of the last EMI, counting the next EMI as next month. */
-export function debtFreeMonth(months: number, today: string): string {
-  const [y, m] = today.split('-').map(Number) as [number, number];
-  const idx = y * 12 + (m - 1) + months;
-  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}`;
-}
+export const debtFreeMonth = (months: number, today: string) => monthAfter(today, months);

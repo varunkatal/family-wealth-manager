@@ -4,6 +4,7 @@ import { CashFlowPage } from '../pages/CashFlowPage';
 import { ContributionsPage } from '../pages/ContributionsPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { FamilyPage } from '../pages/FamilyPage';
+import { GoalsPage } from '../pages/GoalsPage';
 import { LiabilitiesPage } from '../pages/LiabilitiesPage';
 import { ProjectionsPage } from '../pages/ProjectionsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
@@ -20,6 +21,7 @@ export function AppRoutes() {
         <Route path="liabilities" element={<LiabilitiesPage />} />
         <Route path="investments" element={<ContributionsPage />} />
         <Route path="cash-flow" element={<CashFlowPage />} />
+        <Route path="goals" element={<GoalsPage />} />
         <Route path="projections" element={<ProjectionsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />

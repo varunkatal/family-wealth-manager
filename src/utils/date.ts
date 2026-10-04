@@ -26,3 +26,10 @@ export function formatMonth(iso: string): string {
   const [y, m] = iso.split('-').map(Number) as [number, number];
   return new Date(y, m - 1, 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
+
+/** YYYY-MM that is `months` after the month of a YYYY-MM-DD date. */
+export function monthAfter(today: string, months: number): string {
+  const [y, m] = today.split('-').map(Number) as [number, number];
+  const idx = y * 12 + (m - 1) + months;
+  return `${Math.floor(idx / 12)}-${String((idx % 12) + 1).padStart(2, '0')}`;
+}

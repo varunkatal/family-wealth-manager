@@ -100,10 +100,10 @@ describe('deleting a member who owns things', () => {
     const { createContribution, deleteContribution } = await import('./contributionRepository');
     const sip = await createContribution({ name: 'SIP', ownerId: a.id, amount: 1000, frequency: 'monthly', startDate: '2026-01-01' });
 
-    expect(await countMemberHoldings(a.id)).toEqual({ assets: 1, liabilities: 1, contributions: 1, incomes: 0, expenses: 0 });
+    expect(await countMemberHoldings(a.id)).toEqual({ assets: 1, liabilities: 1, contributions: 1, incomes: 0, expenses: 0, goals: 0 });
     const err = await deleteFamilyMember(a.id).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(MemberHasHoldingsError);
-    expect(err).toMatchObject({ holdings: { assets: 1, liabilities: 1, contributions: 1, incomes: 0, expenses: 0 } });
+    expect(err).toMatchObject({ holdings: { assets: 1, liabilities: 1, contributions: 1, incomes: 0, expenses: 0, goals: 0 } });
     expect(await listFamilyMembers()).toHaveLength(1);
 
     await deleteAsset(asset.id);

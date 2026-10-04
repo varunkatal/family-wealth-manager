@@ -3,13 +3,14 @@ import type { Asset } from '../../models/asset';
 import type { Expense, Income } from '../../models/cashFlow';
 import type { Contribution } from '../../models/contribution';
 import type { Goal } from '../../models/goal';
+import type { AssetValuation, Snapshot } from '../../models/history';
 import type { FamilyMember } from '../../models/familyMember';
 import type { Liability } from '../../models/liability';
 import type { AssetOwnership } from '../../models/ownership';
 import type { AppSettings } from '../../models/settings';
 
 export const DB_NAME = 'family-wealth-calculator';
-export const DB_VERSION = 7;
+export const DB_VERSION = 8;
 
 export interface WealthDB extends DBSchema {
   settings: {
@@ -54,6 +55,15 @@ export interface WealthDB extends DBSchema {
     value: Goal;
     indexes: { 'by-owner': string };
   };
+  snapshots: {
+    key: string;
+    value: Snapshot;
+  };
+  assetValuations: {
+    key: string;
+    value: AssetValuation;
+    indexes: { 'by-asset': string };
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<WealthDB>> | null = null;
@@ -90,6 +100,10 @@ export function getDb(): Promise<IDBPDatabase<WealthDB>> {
         }
         if (oldVersion < 7) {
           db.createObjectStore('goals', { keyPath: 'id' }).createIndex('by-owner', 'ownerId');
+        }
+        if (oldVersion < 8) {
+          db.createObjectStore('snapshots', { keyPath: 'id' });
+          db.createObjectStore('assetValuations', { keyPath: 'id' }).createIndex('by-asset', 'assetId');
         }
       },
       // Another tab is upgrading the database: release our connection so it can proceed.

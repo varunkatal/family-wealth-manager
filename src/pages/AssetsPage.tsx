@@ -291,7 +291,7 @@ export function AssetsPage() {
           message={
             <p>
               <strong className="text-slate-900 dark:text-slate-100">{dialog.asset.name}</strong> will be permanently
-              removed. This can't be undone.
+              removed, with its value history. This can't be undone.
               {linkedCount(dialog.asset.id) > 0 && (
                 <>
                   {' '}

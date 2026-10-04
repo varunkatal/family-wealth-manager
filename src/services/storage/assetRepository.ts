@@ -31,7 +31,7 @@ function splitInput(input: AssetInput): { fields: Omit<ParsedAsset, 'owners'>; o
   return { fields, owners };
 }
 
-const TX_STORES = ['assets', 'assetOwnerships', 'familyMembers', 'contributions'] as const;
+const TX_STORES = ['assets', 'assetOwnerships', 'familyMembers', 'contributions', 'assetValuations'] as const;
 type AssetTx = IDBPTransaction<WealthDB, typeof TX_STORES extends readonly (infer S)[] ? S[] : never, 'readwrite'>;
 
 /** Writes the asset and replaces its ownership records, inside one transaction. */
@@ -75,6 +75,7 @@ export async function createAsset(input: AssetInput): Promise<Asset> {
   // `add` fails rather than overwrite if the ID already exists.
   return inTransaction(async (tx) => {
     await writeAssetWithOwners(tx, asset, owners, true);
+    await recordValuation(tx.objectStore('assetValuations'), asset);
     return asset;
   });
 }
@@ -92,12 +93,15 @@ export async function updateAsset(id: string, input: AssetInput): Promise<Asset>
       updatedAt: new Date().toISOString(),
     };
     await writeAssetWithOwners(tx, updated, owners, false);
+    if (existing.currentValue !== updated.currentValue || existing.valuationDate !== updated.valuationDate) {
+      await recordValuation(tx.objectStore('assetValuations'), updated);
+    }
     return updated;
   });
 }
 
 /**
- * Deletes an asset together with its ownership records. Contributions linked to it are kept
+ * Deletes an asset together with its ownership records and valuation history. Contributions linked to it are kept
  * but unlinked (the confirmation tells the user), so no investment record is lost.
  */
 export async function deleteAsset(id: string): Promise<void> {
@@ -105,8 +109,29 @@ export async function deleteAsset(id: string): Promise<void> {
     const ownerships = tx.objectStore('assetOwnerships');
     for (const key of await ownerships.index('by-asset').getAllKeys(id)) await ownerships.delete(key);
     await unlinkContributions(tx.objectStore('contributions'), id);
+    await deleteValuationsOf(tx.objectStore('assetValuations'), id);
     await tx.objectStore('assets').delete(id);
   });
+}
+
+type ValuationStore = IDBPObjectStore<WealthDB, StoreNames<WealthDB>[], 'assetValuations', 'readwrite'>;
+
+/** Adds the asset's current value to its valuation history (spec §18). */
+export async function recordValuation(store: ValuationStore, asset: Asset): Promise<void> {
+  await store.add({
+    id: crypto.randomUUID(),
+    assetId: asset.id,
+    date: asset.valuationDate,
+    value: asset.currentValue,
+    source: 'asset-update',
+    ...(asset.isDemo && { isDemo: true }),
+    createdAt: new Date().toISOString(),
+  });
+}
+
+/** Removes an asset's valuation history (only when the asset itself is deleted). */
+export async function deleteValuationsOf(store: ValuationStore, assetId: string): Promise<void> {
+  for (const key of await store.index('by-asset').getAllKeys(assetId)) await store.delete(key);
 }
 
 type ContributionStore = IDBPObjectStore<WealthDB, StoreNames<WealthDB>[], 'contributions', 'readwrite'>;

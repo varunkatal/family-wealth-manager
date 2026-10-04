@@ -2,10 +2,11 @@ import { assetInputSchema } from '../../models/asset';
 import { familyMemberInputSchema, type FamilyMember } from '../../models/familyMember';
 import { liabilityInputSchema } from '../../models/liability';
 import type { DemoData } from '../demo/demoData';
-import { unlinkContributions } from './assetRepository';
+import { deleteValuationsOf, recordValuation, unlinkContributions } from './assetRepository';
+import { monthAfter, todayISODate } from '../../utils/date';
 import { getDb } from './db';
 
-const DEMO_STORES = ['familyMembers', 'assets', 'assetOwnerships', 'liabilities', 'contributions', 'incomes', 'expenses', 'goals'] as const;
+const DEMO_STORES = ['familyMembers', 'assets', 'assetOwnerships', 'liabilities', 'contributions', 'incomes', 'expenses', 'goals', 'snapshots', 'assetValuations'] as const;
 
 /** Adds demo members, assets (with owners) and liabilities in one transaction, all marked as demo. */
 export async function loadDemoData(data: DemoData): Promise<void> {
@@ -31,12 +32,26 @@ export async function loadDemoData(data: DemoData): Promise<void> {
     ...stamp,
   }));
 
+  const snapshots = data.snapshots.map((x, i) => ({
+    id: crypto.randomUUID(),
+    date: `${monthAfter(todayISODate(), -x.monthsAgo)}-01`,
+    totalAssets: x.totalAssets,
+    totalLiabilities: x.totalLiabilities,
+    netWorth: x.totalAssets - x.totalLiabilities,
+    source: 'manual' as const,
+    notes: 'Demo data',
+    isDemo: true as const,
+    createdAt: new Date(Date.now() + i).toISOString(),
+  }));
+
   const db = await getDb();
   const tx = db.transaction([...DEMO_STORES], 'readwrite');
   await Promise.all([
+    ...snapshots.map((x) => tx.objectStore('snapshots').add(x)),
     ...Object.values(members).map((m) => tx.objectStore('familyMembers').add(m)),
     ...assets.flatMap(({ asset, owners }) => [
       tx.objectStore('assets').add(asset),
+      recordValuation(tx.objectStore('assetValuations'), asset),
       ...owners.map((o) => tx.objectStore('assetOwnerships').add({ id: crypto.randomUUID(), assetId: asset.id, ...o })),
     ]),
     ...liabilities.map((l) => tx.objectStore('liabilities').add(l)),
@@ -64,8 +79,10 @@ export async function clearDemoData(): Promise<ClearDemoResult> {
   for (const asset of demoAssets) {
     for (const key of await ownershipStore.index('by-asset').getAllKeys(asset.id)) await ownershipStore.delete(key);
     await unlinkContributions(contributionStore, asset.id);
+    await deleteValuationsOf(tx.objectStore('assetValuations'), asset.id);
     await assetStore.delete(asset.id);
   }
+  for (const s of await tx.objectStore('snapshots').getAll()) if (s.isDemo) await tx.objectStore('snapshots').delete(s.id);
   const demoLiabilities = (await liabilityStore.getAll()).filter((l) => l.isDemo === true);
   for (const l of demoLiabilities) await liabilityStore.delete(l.id);
 

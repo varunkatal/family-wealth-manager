@@ -12,6 +12,8 @@ export type DemoData = {
   members: Record<'A' | 'B', FamilyMemberInput>;
   assets: (Omit<AssetInput, 'owners'> & { owners: { member: 'A' | 'B'; percentage: number }[] })[];
   liabilities: (Omit<LiabilityInput, 'ownerId'> & { owner: 'A' | 'B' })[];
+  /** Fake past snapshots, so the history chart has something to show. */
+  snapshots: { monthsAgo: number; totalAssets: number; totalLiabilities: number }[];
 };
 
 export function buildDemoData(): DemoData {
@@ -81,5 +83,13 @@ export function buildDemoData(): DemoData {
       },
     ],
     liabilities: [{ name: 'Example Home Loan', type: 'Home Loan', currentOutstanding: 200000, notes: 'Demo data', owner: 'A' }],
+    snapshots: [
+      { monthsAgo: 6, totalAssets: 4000000, totalLiabilities: 300000 },
+      { monthsAgo: 5, totalAssets: 4100000, totalLiabilities: 280000 },
+      { monthsAgo: 4, totalAssets: 4050000, totalLiabilities: 260000 },
+      { monthsAgo: 3, totalAssets: 4250000, totalLiabilities: 240000 },
+      { monthsAgo: 2, totalAssets: 4300000, totalLiabilities: 220000 },
+      { monthsAgo: 1, totalAssets: 4400000, totalLiabilities: 210000 },
+    ],
   };
 }

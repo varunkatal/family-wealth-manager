@@ -13,6 +13,8 @@ type LineChartProps = {
   /** Accessible name. */
   label: string;
   height?: number;
+  /** Optional x values (e.g. day numbers) for uneven spacing such as dated snapshots. Default: evenly spaced. */
+  xValues?: number[];
 };
 
 const PAD = { top: 12, right: 16, bottom: 28, left: 64 };
@@ -39,7 +41,7 @@ export function niceTicks(min: number, max: number, count = 4): number[] {
  * a crosshair that snaps to the nearest year with one tooltip for every series,
  * and arrow-key navigation. Every value is also in a table on the page.
  */
-export function LineChart({ series, xLabels, format, formatAxis, label, height = 240 }: LineChartProps) {
+export function LineChart({ series, xLabels, format, formatAxis, label, height = 240, xValues }: LineChartProps) {
   const ref = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(640);
   const [active, setActive] = useState<number | null>(null);
@@ -59,14 +61,21 @@ export function LineChart({ series, xLabels, format, formatAxis, label, height =
   const yMax = ticks.at(-1)!;
   const plotW = Math.max(width - PAD.left - PAD.right, 10);
   const plotH = height - PAD.top - PAD.bottom;
-  const x = (i: number) => PAD.left + (n <= 1 ? plotW / 2 : (i / (n - 1)) * plotW);
+  const xs = xValues ?? xLabels.map((_, i) => i);
+  const xMin = xs[0] ?? 0;
+  const xSpan = (xs.at(-1) ?? 0) - xMin;
+  const x = (i: number) => PAD.left + (n <= 1 || xSpan === 0 ? plotW / 2 : ((xs[i]! - xMin) / xSpan) * plotW);
   const y = (v: number) => PAD.top + plotH - ((v - yMin) / (yMax - yMin || 1)) * plotH;
+  // Label every k-th point so labels don't collide (~70px each).
   const xTickEvery = Math.max(1, Math.ceil((n - 1) / Math.max(1, Math.floor(plotW / 70))));
 
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     const box = e.currentTarget.getBoundingClientRect();
     const px = ((e.clientX - box.left) / box.width) * width;
-    setActive(Math.min(n - 1, Math.max(0, Math.round(((px - PAD.left) / plotW) * (n - 1)))));
+    // Snap to the nearest point.
+    let nearest = 0;
+    for (let i = 1; i < n; i++) if (Math.abs(x(i) - px) < Math.abs(x(nearest) - px)) nearest = i;
+    setActive(nearest);
   };
   const onKey = (e: KeyboardEvent) => {
     if (e.key === 'ArrowRight') setActive((a) => Math.min(n - 1, (a ?? -1) + 1));
@@ -79,14 +88,17 @@ export function LineChart({ series, xLabels, format, formatAxis, label, height =
 
   return (
     <div>
-      <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300" aria-label="Legend">
-        {series.map((s) => (
-          <li key={s.key} className="flex items-center gap-1.5">
-            <span className="inline-block h-0.5 w-4 rounded-full" style={{ background: s.color }} aria-hidden="true" />
-            {s.label}
-          </li>
-        ))}
-      </ul>
+      {/* A single series needs no legend: the chart's title names it. */}
+      {series.length > 1 && (
+        <ul className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600 dark:text-slate-300" aria-label="Legend">
+          {series.map((s) => (
+            <li key={s.key} className="flex items-center gap-1.5">
+              <span className="inline-block h-0.5 w-4 rounded-full" style={{ background: s.color }} aria-hidden="true" />
+              {s.label}
+            </li>
+          ))}
+        </ul>
+      )}
       <div ref={ref} className="relative">
         <svg
           width={width}
@@ -110,7 +122,13 @@ export function LineChart({ series, xLabels, format, formatAxis, label, height =
           ))}
           {xLabels.map((l, i) =>
             i % xTickEvery === 0 || i === n - 1 ? (
-              <text key={i} x={x(i)} y={height - 8} textAnchor="middle" className="fill-slate-500 text-[11px] dark:fill-slate-400">
+              <text
+                key={i}
+                x={x(i)}
+                y={height - 8}
+                // Edge labels are anchored inwards so they are never clipped.
+                textAnchor={n > 1 && i === 0 ? 'start' : n > 1 && i === n - 1 ? 'end' : 'middle'}
+                className="fill-slate-500 text-[11px] dark:fill-slate-400">
                 {l}
               </text>
             ) : null,

@@ -3,6 +3,7 @@ import { AssetsPage } from '../pages/AssetsPage';
 import { CashFlowPage } from '../pages/CashFlowPage';
 import { ContributionsPage } from '../pages/ContributionsPage';
 import { DashboardPage } from '../pages/DashboardPage';
+import { DataPage } from '../pages/DataPage';
 import { FamilyPage } from '../pages/FamilyPage';
 import { GoalsPage } from '../pages/GoalsPage';
 import { HistoryPage } from '../pages/HistoryPage';
@@ -25,6 +26,7 @@ export function AppRoutes() {
         <Route path="goals" element={<GoalsPage />} />
         <Route path="projections" element={<ProjectionsPage />} />
         <Route path="history" element={<HistoryPage />} />
+        <Route path="data" element={<DataPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

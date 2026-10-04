@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useSettings } from '../app/SettingsContext';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
@@ -68,8 +69,14 @@ export function SettingsPage() {
       )}
 
       <Card className="mt-6">
-        <h2 className="font-medium">More settings coming</h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Backup, restore and data deletion will be added in a later phase.</p>
+        <h2 className="font-medium">Your data</h2>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+          Backup, restore, export and deletion are on the{' '}
+          <Link to="/data" className="font-medium text-teal-700 underline dark:text-teal-400">
+            Backup &amp; data
+          </Link>{' '}
+          page.
+        </p>
       </Card>
     </>
   );

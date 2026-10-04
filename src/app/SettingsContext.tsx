@@ -8,6 +8,8 @@ type SettingsContextValue = {
   loading: boolean;
   error: string | null;
   updateSettings: (patch: Partial<AppSettings>) => Promise<void>;
+  /** Re-reads settings from storage (after a restore or delete). */
+  reload: () => Promise<void>;
 };
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
@@ -59,8 +61,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [settings],
   );
 
+  const reload = useCallback(async () => {
+    try {
+      setSettings(await getSettings());
+      setError(null);
+    } catch {
+      setError('Could not load saved settings. Using defaults.');
+    }
+  }, []);
+
   return (
-    <SettingsContext.Provider value={{ settings, loading, error, updateSettings }}>
+    <SettingsContext.Provider value={{ settings, loading, error, updateSettings, reload }}>
       {children}
     </SettingsContext.Provider>
   );

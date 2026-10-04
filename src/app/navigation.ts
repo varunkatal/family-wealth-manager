@@ -17,5 +17,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/goals', label: 'Goals', icon: 'goals' },
   { to: '/projections', label: 'Projections', icon: 'projections' },
   { to: '/history', label: 'History', icon: 'history' },
+  { to: '/data', label: 'Backup & data', icon: 'data' },
   { to: '/settings', label: 'Settings', icon: 'settings' },
 ];

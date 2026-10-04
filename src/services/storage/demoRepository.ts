@@ -2,9 +2,10 @@ import { assetInputSchema } from '../../models/asset';
 import { familyMemberInputSchema, type FamilyMember } from '../../models/familyMember';
 import { liabilityInputSchema } from '../../models/liability';
 import type { DemoData } from '../demo/demoData';
+import { unlinkContributions } from './assetRepository';
 import { getDb } from './db';
 
-const DEMO_STORES = ['familyMembers', 'assets', 'assetOwnerships', 'liabilities'] as const;
+const DEMO_STORES = ['familyMembers', 'assets', 'assetOwnerships', 'liabilities', 'contributions'] as const;
 
 /** Adds demo members, assets (with owners) and liabilities in one transaction, all marked as demo. */
 export async function loadDemoData(data: DemoData): Promise<void> {
@@ -47,7 +48,7 @@ export type ClearDemoResult = { assets: number; liabilities: number; members: nu
 
 /**
  * Removes demo assets (and their ownership records), demo liabilities, and demo members.
- * A demo member who now owns one of the user's own assets or liabilities is kept and becomes a
+ * A demo member who now owns one of the user's own assets, liabilities or contributions is kept and becomes a
  * regular member (the demo label is removed), so real data is never orphaned. The caller reports this.
  */
 export async function clearDemoData(): Promise<ClearDemoResult> {
@@ -57,10 +58,12 @@ export async function clearDemoData(): Promise<ClearDemoResult> {
   const ownershipStore = tx.objectStore('assetOwnerships');
   const liabilityStore = tx.objectStore('liabilities');
   const memberStore = tx.objectStore('familyMembers');
+  const contributionStore = tx.objectStore('contributions');
 
   const demoAssets = (await assetStore.getAll()).filter((a) => a.isDemo === true);
   for (const asset of demoAssets) {
     for (const key of await ownershipStore.index('by-asset').getAllKeys(asset.id)) await ownershipStore.delete(key);
+    await unlinkContributions(contributionStore, asset.id);
     await assetStore.delete(asset.id);
   }
   const demoLiabilities = (await liabilityStore.getAll()).filter((l) => l.isDemo === true);
@@ -71,7 +74,8 @@ export async function clearDemoData(): Promise<ClearDemoResult> {
   for (const member of (await memberStore.getAll()).filter((m) => m.isDemo === true)) {
     const stillOwns =
       (await ownershipStore.index('by-member').count(member.id)) +
-      (await liabilityStore.index('by-owner').count(member.id));
+      (await liabilityStore.index('by-owner').count(member.id)) +
+      (await contributionStore.index('by-owner').count(member.id));
     if (stillOwns > 0) {
       const { isDemo: _dropped, ...regular } = member;
       await memberStore.put({ ...regular, updatedAt: new Date().toISOString() });

@@ -36,7 +36,8 @@ const SORT_OPTIONS: { value: AssetSort; label: string }[] = [
 ];
 
 export function AssetsPage() {
-  const { assets, ownerships, members, liabilities, memberById, wealth, loading, error, run } = useWealthData();
+  const { assets, ownerships, members, liabilities, contributions, memberById, wealth, loading, error, run } = useWealthData();
+  const linkedCount = (assetId: string) => contributions.filter((c) => c.linkedAssetId === assetId).length;
   const { settings } = useSettings();
   const [filters, setFilters] = useState<AssetFilters>(EMPTY_FILTERS);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -291,6 +292,14 @@ export function AssetsPage() {
             <p>
               <strong className="text-slate-900 dark:text-slate-100">{dialog.asset.name}</strong> will be permanently
               removed. This can't be undone.
+              {linkedCount(dialog.asset.id) > 0 && (
+                <>
+                  {' '}
+                  {linkedCount(dialog.asset.id)} regular{' '}
+                  {linkedCount(dialog.asset.id) === 1 ? 'investment is' : 'investments are'} linked to it; they will be
+                  kept but no longer linked.
+                </>
+              )}
             </p>
           }
           confirmLabel="Delete"

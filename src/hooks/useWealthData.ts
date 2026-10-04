@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Asset } from '../models/asset';
+import type { Contribution } from '../models/contribution';
 import type { FamilyMember } from '../models/familyMember';
 import type { Liability } from '../models/liability';
 import type { AssetOwnership } from '../models/ownership';
 import { calculateFamilyWealth, type FamilyWealth } from '../services/finance/netWorth';
 import { listAssets, listOwnerships } from '../services/storage/assetRepository';
+import { listContributions } from '../services/storage/contributionRepository';
 import { listFamilyMembers } from '../services/storage/familyMemberRepository';
 import { listLiabilities } from '../services/storage/liabilityRepository';
 
@@ -13,9 +15,10 @@ type WealthData = {
   assets: Asset[];
   ownerships: AssetOwnership[];
   liabilities: Liability[];
+  contributions: Contribution[];
 };
 
-const EMPTY: WealthData = { members: [], assets: [], ownerships: [], liabilities: [] };
+const EMPTY: WealthData = { members: [], assets: [], ownerships: [], liabilities: [], contributions: [] };
 
 /**
  * Loads all wealth records together and derives totals from them,
@@ -28,13 +31,14 @@ export function useWealthData() {
 
   const reload = useCallback(async () => {
     try {
-      const [members, assets, ownerships, liabilities] = await Promise.all([
+      const [members, assets, ownerships, liabilities, contributions] = await Promise.all([
         listFamilyMembers(),
         listAssets(),
         listOwnerships(),
         listLiabilities(),
+        listContributions(),
       ]);
-      setData({ members, assets, ownerships, liabilities });
+      setData({ members, assets, ownerships, liabilities, contributions });
       setError(null);
     } catch {
       setError('Could not load your data.');

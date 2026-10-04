@@ -1,6 +1,6 @@
 import { assetInputSchema, assetSchema, type Asset, type AssetInput } from '../../models/asset';
 import { assetOwnershipSchema, type AssetOwnership } from '../../models/ownership';
-import type { IDBPTransaction } from 'idb';
+import type { IDBPObjectStore, IDBPTransaction } from 'idb';
 import { getDb, type WealthDB } from './db';
 
 /** All valid stored assets, highest current value first. */
@@ -31,7 +31,7 @@ function splitInput(input: AssetInput): { fields: Omit<ParsedAsset, 'owners'>; o
   return { fields, owners };
 }
 
-const TX_STORES = ['assets', 'assetOwnerships', 'familyMembers'] as const;
+const TX_STORES = ['assets', 'assetOwnerships', 'familyMembers', 'contributions'] as const;
 type AssetTx = IDBPTransaction<WealthDB, typeof TX_STORES extends readonly (infer S)[] ? S[] : never, 'readwrite'>;
 
 /** Writes the asset and replaces its ownership records, inside one transaction. */
@@ -96,11 +96,26 @@ export async function updateAsset(id: string, input: AssetInput): Promise<Asset>
   });
 }
 
-/** Deletes an asset together with its ownership records. */
+/**
+ * Deletes an asset together with its ownership records. Contributions linked to it are kept
+ * but unlinked (the confirmation tells the user), so no investment record is lost.
+ */
 export async function deleteAsset(id: string): Promise<void> {
   await inTransaction(async (tx) => {
     const ownerships = tx.objectStore('assetOwnerships');
     for (const key of await ownerships.index('by-asset').getAllKeys(id)) await ownerships.delete(key);
+    await unlinkContributions(tx.objectStore('contributions'), id);
     await tx.objectStore('assets').delete(id);
   });
+}
+
+type ContributionStore = IDBPObjectStore<WealthDB, ('contributions' | 'assets' | 'assetOwnerships' | 'familyMembers' | 'liabilities')[], 'contributions', 'readwrite'>;
+
+/** Removes the link from every contribution that points at an asset. */
+export async function unlinkContributions(store: ContributionStore, assetId: string): Promise<void> {
+  const now = new Date().toISOString();
+  for (const c of await store.index('by-asset').getAll(assetId)) {
+    const { linkedAssetId: _unlinked, ...rest } = c;
+    await store.put({ ...rest, updatedAt: now });
+  }
 }

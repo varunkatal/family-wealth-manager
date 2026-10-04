@@ -4,7 +4,8 @@ import {
   type FamilyMember,
   type FamilyMemberInput,
 } from '../../models/familyMember';
-import { getDb } from './db';
+import type { IDBPTransaction } from 'idb';
+import { getDb, type WealthDB } from './db';
 
 /** All valid stored members, active first, then oldest first. */
 export async function listFamilyMembers(): Promise<FamilyMember[]> {
@@ -44,42 +45,53 @@ export async function updateFamilyMember(id: string, input: FamilyMemberInput): 
   return updated;
 }
 
-/** Thrown when deleting a member who still owns assets or owes liabilities. */
+/** Records that belong to a member and would be orphaned if the member were deleted. */
+export type MemberHoldings = { assets: number; liabilities: number; contributions: number };
+
+const HOLDING_STORES = ['assetOwnerships', 'liabilities', 'contributions'] as const;
+
+export const totalHoldings = (h: MemberHoldings) => Object.values(h).reduce((s, n) => s + n, 0);
+
+/** Thrown when deleting a member who still owns assets, liabilities or other records. */
 export class MemberHasHoldingsError extends Error {
-  constructor(
-    readonly assetCount: number,
-    readonly liabilityCount: number,
-  ) {
-    super('This family member still owns assets or liabilities');
+  constructor(readonly holdings: MemberHoldings) {
+    super('This family member still owns records');
     this.name = 'MemberHasHoldingsError';
   }
 }
 
-/** Number of assets a member co-owns and liabilities they owe. */
-export async function countMemberHoldings(id: string): Promise<{ assets: number; liabilities: number }> {
-  const db = await getDb();
-  const [assets, liabilities] = await Promise.all([
-    db.countFromIndex('assetOwnerships', 'by-member', id),
-    db.countFromIndex('liabilities', 'by-owner', id),
+type HoldingsTx = IDBPTransaction<WealthDB, ('familyMembers' | (typeof HOLDING_STORES)[number])[], IDBTransactionMode>;
+
+async function countIn(tx: HoldingsTx, id: string): Promise<MemberHoldings> {
+  const [assets, liabilities, contributions] = await Promise.all([
+    tx.objectStore('assetOwnerships').index('by-member').count(id),
+    tx.objectStore('liabilities').index('by-owner').count(id),
+    tx.objectStore('contributions').index('by-owner').count(id),
   ]);
-  return { assets, liabilities };
+  return { assets, liabilities, contributions };
+}
+
+/** Number of asset shares, liabilities and other records that belong to a member. */
+export async function countMemberHoldings(id: string): Promise<MemberHoldings> {
+  const db = await getDb();
+  const tx = db.transaction([...HOLDING_STORES], 'readonly') as unknown as HoldingsTx;
+  const holdings = await countIn(tx, id);
+  await tx.done;
+  return holdings;
 }
 
 /**
- * Deletes a member. Refuses if they own any asset share or liability, so their share
- * can never silently drop out of net worth; those must be reassigned first.
+ * Deletes a member. Refuses if anything still belongs to them, so their share can never
+ * silently drop out of net worth; those records must be reassigned first.
  */
 export async function deleteFamilyMember(id: string): Promise<void> {
   const db = await getDb();
-  const tx = db.transaction(['familyMembers', 'assetOwnerships', 'liabilities'], 'readwrite');
-  const [assets, liabilities] = await Promise.all([
-    tx.objectStore('assetOwnerships').index('by-member').count(id),
-    tx.objectStore('liabilities').index('by-owner').count(id),
-  ]);
-  if (assets > 0 || liabilities > 0) {
+  const tx = db.transaction(['familyMembers', ...HOLDING_STORES], 'readwrite');
+  const holdings = await countIn(tx, id);
+  if (totalHoldings(holdings) > 0) {
     tx.abort();
     await tx.done.catch(() => undefined);
-    throw new MemberHasHoldingsError(assets, liabilities);
+    throw new MemberHasHoldingsError(holdings);
   }
   await tx.objectStore('familyMembers').delete(id);
   await tx.done;

@@ -14,7 +14,8 @@ import { getAssetClassOptions, getSubcategoryOptions } from '../../models/assetC
 import type { FamilyMember } from '../../models/familyMember';
 import type { AssetOwnership } from '../../models/ownership';
 import { calculateQuantityValue } from '../../services/finance/assetValuation';
-import { formatINRCompact, formatINRExact, parseAmountInput } from '../../utils/currency';
+import { formatINRExact, parseAmountInput } from '../../utils/currency';
+import { amountHint, numberText } from '../../utils/formInput';
 import { todayISODate } from '../../utils/date';
 import { defaultOwnerRows, OwnershipFields, parsePercent, type OwnerRow } from './OwnershipFields';
 
@@ -44,7 +45,6 @@ type FormValues = {
 type ErrorKey = keyof AssetInput;
 type FieldErrors = Partial<Record<ErrorKey, string>>;
 
-const numberText = (n: number | undefined) => (n === undefined ? '' : String(n));
 
 function toFormValues(asset?: Asset): FormValues {
   return {
@@ -95,15 +95,6 @@ const validAmount = (text: string) => {
   const n = parseAmountInput(text);
   return n === undefined || Number.isNaN(n) ? undefined : n;
 };
-
-/** "₹10,00,000 · ₹10 Lakh" under an amount field, so large numbers are easy to check. */
-function amountHint(text: string): string | undefined {
-  const n = parseAmountInput(text);
-  if (n === undefined || Number.isNaN(n)) return undefined;
-  const exact = formatINRExact(n);
-  const compact = formatINRCompact(n);
-  return exact === compact ? exact : `${exact} · ${compact}`;
-}
 
 type AssetFormProps = {
   asset?: Asset;

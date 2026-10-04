@@ -15,44 +15,46 @@ import {
   createFamilyMember,
   deleteFamilyMember,
   MemberHasHoldingsError,
+  totalHoldings,
   updateFamilyMember,
+  type MemberHoldings,
 } from '../services/storage/familyMemberRepository';
 import { formatINR } from '../utils/currency';
 import { ageFromDateOfBirth, formatISODate } from '../utils/date';
 
 type StatusFilter = 'all' | 'active' | 'inactive';
 
-type Holdings = { assets: number; liabilities: number };
-
 type Dialog =
   | { kind: 'add' }
   | { kind: 'edit'; member: FamilyMember }
   | { kind: 'delete'; member: FamilyMember }
-  | { kind: 'blocked'; member: FamilyMember; holdings: Holdings }
+  | { kind: 'blocked'; member: FamilyMember; holdings: MemberHoldings }
   | null;
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-function describeHoldings({ assets, liabilities }: Holdings): string {
+function describeHoldings({ assets, liabilities, contributions }: MemberHoldings): string {
   const parts: string[] = [];
   if (assets > 0) parts.push(`co-owns ${plural(assets, 'asset')}`);
   if (liabilities > 0) parts.push(`owes ${liabilities} ${liabilities === 1 ? 'liability' : 'liabilities'}`);
-  return parts.join(' and ');
+  if (contributions > 0) parts.push(`makes ${plural(contributions, 'regular investment')}`);
+  return parts.length > 1 ? `${parts.slice(0, -1).join(', ')} and ${parts.at(-1)}` : parts.join('');
 }
 
 export function FamilyPage() {
-  const { members, assets, ownerships, liabilities, wealth, loading, error, run } = useWealthData();
+  const { members, assets, ownerships, liabilities, contributions, wealth, loading, error, run } = useWealthData();
   const { settings } = useSettings();
   const fmt = (n: number) => formatINR(n, settings.numberFormat);
   const wealthById = new Map(wealth.byMember.map((w) => [w.memberId, w]));
-  const holdingsOf = (id: string): Holdings => ({
+  const holdingsOf = (id: string): MemberHoldings => ({
     assets: ownerships.filter((o) => o.familyMemberId === id).length,
     liabilities: liabilities.filter((l) => l.ownerId === id).length,
+    contributions: contributions.filter((c) => c.ownerId === id).length,
   });
   const demoCount = [...members, ...assets, ...liabilities].filter((r) => r.isDemo).length;
   const requestDelete = (member: FamilyMember) => {
     const holdings = holdingsOf(member.id);
-    setDialog(holdings.assets + holdings.liabilities > 0 ? { kind: 'blocked', member, holdings } : { kind: 'delete', member });
+    setDialog(totalHoldings(holdings) > 0 ? { kind: 'blocked', member, holdings } : { kind: 'delete', member });
   };
   const [filter, setFilter] = useState<StatusFilter>('all');
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -182,7 +184,7 @@ export function FamilyPage() {
             } catch (err) {
               // The repository re-checks holdings; data may have changed in another tab.
               if (err instanceof MemberHasHoldingsError) {
-                setDialog({ kind: 'blocked', member: dialog.member, holdings: { assets: err.assetCount, liabilities: err.liabilityCount } });
+                setDialog({ kind: 'blocked', member: dialog.member, holdings: err.holdings });
               } else {
                 setActionError('Could not delete the family member.');
                 close();

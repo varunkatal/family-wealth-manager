@@ -4,7 +4,8 @@ import { Icon } from '../../components/Icon';
 import { inputClass } from '../../components/FormField';
 import type { FamilyMember } from '../../models/familyMember';
 import { calculateOwnershipValue } from '../../services/finance/netWorth';
-import { formatINRExact, parseAmountInput } from '../../utils/currency';
+import { formatINRExact } from '../../utils/currency';
+import { parsePercent } from '../../utils/formInput';
 
 export type OwnerRow = { memberId: string; percentage: string };
 
@@ -17,7 +18,7 @@ type OwnershipFieldsProps = {
   error?: string;
 };
 
-export const parsePercent = (text: string) => parseAmountInput(text.replace('%', ''));
+export { parsePercent };
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 

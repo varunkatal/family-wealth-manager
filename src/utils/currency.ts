@@ -1,17 +1,18 @@
 import type { NumberFormat } from '../models/settings';
 
-const exactFormatter = new Intl.NumberFormat('en-IN', {
+const wholeRupees = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
+const withPaise = new Intl.NumberFormat('en-IN', {
   style: 'currency',
   currency: 'INR',
-  minimumFractionDigits: 0,
+  minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
 
 const compactNumber = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
 
-/** ₹10,00,000 (Indian digit grouping). */
+/** ₹10,00,000 (Indian digit grouping). Amounts with paise always show two decimals: ₹2,500.50. */
 export function formatINRExact(value: number): string {
-  return exactFormatter.format(value);
+  return Number.isInteger(Math.round(value * 100) / 100) ? wholeRupees.format(value) : withPaise.format(value);
 }
 
 /** ₹2.5 Lakh, ₹1.2 Crore. Amounts under one lakh use the exact format. */

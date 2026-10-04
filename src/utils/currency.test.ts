@@ -10,7 +10,7 @@ describe('currency formatting', () => {
   });
 
   it('keeps paise when present', () => {
-    expect(formatINRExact(2500.5)).toBe('₹2,500.5');
+    expect(formatINRExact(2500.5)).toBe('₹2,500.50');
     expect(formatINRExact(2500.25)).toBe('₹2,500.25');
   });
 

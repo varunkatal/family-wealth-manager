@@ -3,6 +3,7 @@ import { AssetsPage } from '../pages/AssetsPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { FamilyPage } from '../pages/FamilyPage';
 import { LiabilitiesPage } from '../pages/LiabilitiesPage';
+import { ProjectionsPage } from '../pages/ProjectionsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { SettingsPage } from '../pages/SettingsPage';
 import { Layout } from './Layout';
@@ -15,6 +16,7 @@ export function AppRoutes() {
         <Route path="family" element={<FamilyPage />} />
         <Route path="assets" element={<AssetsPage />} />
         <Route path="liabilities" element={<LiabilitiesPage />} />
+        <Route path="projections" element={<ProjectionsPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

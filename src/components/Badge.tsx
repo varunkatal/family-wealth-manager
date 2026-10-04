@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 const TONES = {
   demo: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
   warning: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300',
+  notice: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200',
 } as const;
 
 export function Badge({ tone, children }: { tone: keyof typeof TONES; children: ReactNode }) {

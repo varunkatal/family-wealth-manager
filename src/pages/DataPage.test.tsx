@@ -98,4 +98,19 @@ describe('Backup & data page (Phase 13)', () => {
     expect(await screen.findByText('All data has been deleted from this browser.')).toBeInTheDocument();
     expect(Object.values(await countRecords()).every((n) => n === 0)).toBe(true);
   });
+
+  it('shows whether storage is persistent and can ask the browser to keep data', async () => {
+    const persist = vi.fn().mockResolvedValue(true);
+    Object.defineProperty(navigator, 'storage', { configurable: true, value: { persisted: vi.fn().mockResolvedValue(false), persist } });
+    try {
+      const user = userEvent.setup();
+      renderApp('/data');
+      expect(await screen.findByTestId('storage-status')).toHaveTextContent('may clear the app');
+      await user.click(screen.getByRole('button', { name: 'Ask the browser to keep it' }));
+      await waitFor(() => expect(screen.getByTestId('storage-status')).toHaveTextContent('will keep your data'));
+      expect(persist).toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(navigator, 'storage');
+    }
+  });
 });

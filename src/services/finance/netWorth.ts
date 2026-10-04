@@ -9,11 +9,12 @@
  *   separately so the user can assign owners.
  */
 
+import { roundToPaise } from './rounding';
+
 type ValuedAsset = { id: string; currentValue: number };
 type Ownership = { assetId: string; familyMemberId: string; percentage: number };
 type OwedLiability = { ownerId: string; currentOutstanding: number };
 
-const roundToPaise = (n: number) => Math.round(n * 100) / 100;
 
 /** Value attributed to one owner: asset value × share %. */
 export function calculateOwnershipValue(assetValue: number, percentage: number): number {

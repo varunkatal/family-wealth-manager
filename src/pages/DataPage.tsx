@@ -1,4 +1,4 @@
-import { useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent } from 'react';
 import { useSettings } from '../app/SettingsContext';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
@@ -19,6 +19,7 @@ import {
   STORE_LABELS,
   type ParsedBackup,
 } from '../services/storage/backupRepository';
+import { isStoragePersistent, requestPersistentStorage } from '../services/storage/persistence';
 import { downloadFile } from '../utils/download';
 import { todayISODate } from '../utils/date';
 
@@ -38,6 +39,10 @@ export function DataPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const stamp = todayISODate();
+  const [persistent, setPersistent] = useState<boolean | null>(null);
+  useEffect(() => {
+    void isStoragePersistent().then(setPersistent).catch(() => setPersistent(null));
+  }, []);
 
   const tables = buildExportTables(data);
   const tableByKey = new Map(tables.map((t) => [t.key, t]));
@@ -129,6 +134,24 @@ export function DataPage() {
           <Button className="mt-4" onClick={() => void downloadBackup()}>
             Download backup
           </Button>
+          {persistent !== null && (
+            <p data-testid="storage-status" className="mt-4 border-t border-slate-100 pt-3 text-sm text-slate-600 dark:border-slate-800 dark:text-slate-400">
+              {persistent ? (
+                'This browser will keep your data even when storage runs low.'
+              ) : (
+                <>
+                  This browser may clear the app's data if storage runs low.{' '}
+                  <button
+                    type="button"
+                    className="font-medium text-teal-700 underline dark:text-teal-400"
+                    onClick={() => void requestPersistentStorage().then((granted) => setPersistent(granted ?? false))}
+                  >
+                    Ask the browser to keep it
+                  </button>
+                </>
+              )}
+            </p>
+          )}
         </Card>
 
         <Card>

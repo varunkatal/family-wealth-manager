@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSettings } from '../app/SettingsContext';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
@@ -43,8 +43,11 @@ export function GoalsPage() {
   });
   const totalRequired = plans.reduce((s, p) => s + (p.required ?? 0), 0);
 
-  const input = { assets, ownerships, contributions, liabilities, classDefaults: settings.classDefaults, today };
-  const projections = SCENARIOS.map((s) => projectFamilyWealth(input, s, MILESTONE_YEARS));
+  // 50-year projections are recalculated only when the underlying data changes.
+  const projections = useMemo(() => {
+    const input = { assets, ownerships, contributions, liabilities, classDefaults: settings.classDefaults, today };
+    return SCENARIOS.map((s) => projectFamilyWealth(input, s, MILESTONE_YEARS));
+  }, [assets, ownerships, contributions, liabilities, settings.classDefaults, today]);
   const netWorthByScenario = Object.fromEntries(projections.map((p) => [p.scenario, p.netWorth])) as Record<Scenario, number[]>;
   const missing = new Set(projections.flatMap((p) => p.assets.filter((a) => a.rate === undefined).map((a) => a.asset.id))).size;
   const hasWealthData = assets.length > 0 || contributions.length > 0 || liabilities.length > 0;

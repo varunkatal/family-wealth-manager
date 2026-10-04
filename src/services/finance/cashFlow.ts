@@ -4,11 +4,11 @@
  * they are shown separately as money set aside after free cash flow.
  */
 import { isActiveOn, PERIODS_PER_YEAR, type Frequency } from './sip';
+import { roundToPaise } from './rounding';
 
 type Flow = { amount: number; frequency: Frequency; startDate?: string; endDate?: string };
 type MemberFlow = Flow & { memberId?: string };
 
-const roundToPaise = (n: number) => Math.round(n * 100) / 100;
 
 /** Annual amount of a recurring item, e.g. ₹50,000 a month → ₹6,00,000. Exact: no monthly rounding. */
 const exactAnnual = (f: Flow) => f.amount * PERIODS_PER_YEAR[f.frequency];
@@ -51,14 +51,4 @@ export function incomeByMember(memberIds: string[], incomes: MemberFlow[], today
     const annual = totalAnnual(incomes.filter((i) => i.memberId === memberId), today);
     return { memberId, monthly: roundToPaise(annual / 12), annual };
   });
-}
-
-/** Monthly totals per key (e.g. expense category), largest first, active items only. */
-export function monthlyByKey<T extends Flow>(items: T[], key: (item: T) => string, today: string): { key: string; monthly: number }[] {
-  const totals = new Map<string, number>();
-  for (const i of items) {
-    if (!isActiveOn(i, today)) continue;
-    totals.set(key(i), (totals.get(key(i)) ?? 0) + exactAnnual(i));
-  }
-  return [...totals.entries()].map(([k, v]) => ({ key: k, monthly: roundToPaise(v / 12) })).sort((a, b) => b.monthly - a.monthly || a.key.localeCompare(b.key));
 }

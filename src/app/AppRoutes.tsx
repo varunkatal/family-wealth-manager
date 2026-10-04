@@ -1,17 +1,22 @@
+import { lazy, type ComponentType } from 'react';
 import { Route, Routes } from 'react-router-dom';
-import { AssetsPage } from '../pages/AssetsPage';
-import { CashFlowPage } from '../pages/CashFlowPage';
-import { ContributionsPage } from '../pages/ContributionsPage';
 import { DashboardPage } from '../pages/DashboardPage';
-import { DataPage } from '../pages/DataPage';
-import { FamilyPage } from '../pages/FamilyPage';
-import { GoalsPage } from '../pages/GoalsPage';
-import { HistoryPage } from '../pages/HistoryPage';
-import { LiabilitiesPage } from '../pages/LiabilitiesPage';
-import { ProjectionsPage } from '../pages/ProjectionsPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
-import { SettingsPage } from '../pages/SettingsPage';
 import { Layout } from './Layout';
+
+// The dashboard loads with the app; other pages load when first opened, keeping the first load small.
+const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) =>
+  lazy(() => load().then((m) => ({ default: m[name] })));
+const FamilyPage = page(() => import('../pages/FamilyPage'), 'FamilyPage');
+const AssetsPage = page(() => import('../pages/AssetsPage'), 'AssetsPage');
+const LiabilitiesPage = page(() => import('../pages/LiabilitiesPage'), 'LiabilitiesPage');
+const ContributionsPage = page(() => import('../pages/ContributionsPage'), 'ContributionsPage');
+const CashFlowPage = page(() => import('../pages/CashFlowPage'), 'CashFlowPage');
+const GoalsPage = page(() => import('../pages/GoalsPage'), 'GoalsPage');
+const ProjectionsPage = page(() => import('../pages/ProjectionsPage'), 'ProjectionsPage');
+const HistoryPage = page(() => import('../pages/HistoryPage'), 'HistoryPage');
+const DataPage = page(() => import('../pages/DataPage'), 'DataPage');
+const SettingsPage = page(() => import('../pages/SettingsPage'), 'SettingsPage');
 
 export function AppRoutes() {
   return (

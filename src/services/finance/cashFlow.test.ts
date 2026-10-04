@@ -1,4 +1,4 @@
-import { annualAmount, calculateCashFlow, incomeByMember, monthlyByKey, totalMonthly } from './cashFlow';
+import { annualAmount, calculateCashFlow, incomeByMember, totalMonthly } from './cashFlow';
 
 const today = '2026-10-05';
 
@@ -40,11 +40,7 @@ describe('cash flow (spec §16)', () => {
     ]);
   });
 
-  it('expenses by category, and helpers', () => {
-    expect(monthlyByKey(expenses, (e) => e.category, today)).toEqual([
-      { key: 'Grocery', monthly: 20000 },
-      { key: 'Insurance', monthly: 5000 },
-    ]);
+  it('helpers', () => {
     expect(annualAmount({ amount: 50000, frequency: 'monthly' })).toBe(600000);
     expect(annualAmount({ amount: 25000, frequency: 'half-yearly' })).toBe(50000);
     expect(totalMonthly([], today)).toBe(0);

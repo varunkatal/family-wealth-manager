@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../app/SettingsContext';
 import { Badge } from '../components/Badge';
@@ -66,11 +66,14 @@ export function ProjectionsPage() {
 
   // One projection per scenario, long enough for both the chosen period and the comparison table.
   const horizon = Math.max(years ?? 0, ...COMPARISON_YEARS);
-  const input = { assets, ownerships, contributions, liabilities, classDefaults: settings.classDefaults, today: todayISODate() };
-  const byScenario = Object.fromEntries(SCENARIOS.map((s) => [s, projectFamilyWealth(input, s, horizon)])) as Record<
-    Scenario,
-    ReturnType<typeof projectFamilyWealth<Asset, (typeof contributions)[number]>>
-  >;
+  // Recalculated only when the data, assumptions or horizon change, not on display toggles.
+  const byScenario = useMemo(() => {
+    const input = { assets, ownerships, contributions, liabilities, classDefaults: settings.classDefaults, today: todayISODate() };
+    return Object.fromEntries(SCENARIOS.map((s) => [s, projectFamilyWealth(input, s, horizon)])) as Record<
+      Scenario,
+      ReturnType<typeof projectFamilyWealth<Asset, (typeof contributions)[number]>>
+    >;
+  }, [assets, ownerships, contributions, liabilities, settings.classDefaults, horizon]);
   const p = byScenario[scenario];
   const hasContributions = contributions.length > 0;
   const assetsWithoutRate = p.assets.filter((a) => a.rate === undefined);

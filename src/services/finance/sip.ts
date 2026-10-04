@@ -9,6 +9,7 @@
  * - An initial lump sum compounds yearly at the annual rate, the same as an asset (spec §12).
  */
 import { calculateFutureValue } from './projection';
+import { roundToPaise } from './rounding';
 
 export const FREQUENCIES = ['monthly', 'quarterly', 'half-yearly', 'yearly'] as const;
 export type Frequency = (typeof FREQUENCIES)[number];
@@ -23,7 +24,6 @@ export const FREQUENCY_LABELS: Record<Frequency, string> = {
   yearly: 'Yearly',
 };
 
-const roundToPaise = (n: number) => Math.round(n * 100) / 100;
 
 /** FV = P × [((1+i)^n − 1) / i], with i = annual rate / periods per year. Rounded to paise. */
 export function calculateSIPFutureValue(

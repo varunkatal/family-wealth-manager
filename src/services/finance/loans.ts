@@ -1,4 +1,5 @@
 import { monthAfter } from '../../utils/date';
+import { roundToPaise } from './rounding';
 
 /**
  * Loans and amortization (spec §14, §22). Pure functions.
@@ -6,7 +7,6 @@ import { monthAfter } from '../../utils/date';
  * and each EMI pays that month's interest first, then principal.
  */
 
-const roundToPaise = (n: number) => Math.round(n * 100) / 100;
 const monthlyRate = (annualRatePct: number) => annualRatePct / 100 / 12;
 
 /** Safety cap so a schedule always ends: 100 years of payments. */

@@ -1,5 +1,5 @@
+import { projectFamilyWealth } from './familyProjection';
 import {
-  calculateFamilyProjection,
   calculateFutureValue,
   calculateImpliedAnnualRate,
   projectByYear,
@@ -32,34 +32,50 @@ describe('future value (spec §12)', () => {
 });
 
 describe('family projection', () => {
-  const assets = [
-    { id: 'equity', presentValue: 1000000, annualRatePct: 12 },
-    { id: 'fd', presentValue: 1000000, annualRatePct: 7 },
-    { id: 'gold', presentValue: 500000, annualRatePct: undefined }, // no rate set: held flat
-  ];
+  // Family-owned assets, each with its own Base rate.
+  const asset = (id: string, currentValue: number, baseGrowthRate: number | undefined) => ({
+    id,
+    name: id,
+    assetClass: 'Equity',
+    currentValue,
+    baseGrowthRate,
+  });
+  const project = (assets: ReturnType<typeof asset>[], years: number) =>
+    projectFamilyWealth(
+      {
+        assets,
+        ownerships: assets.map((a) => ({ assetId: a.id, familyMemberId: 'A', percentage: 100 })),
+        contributions: [],
+        liabilities: [],
+        classDefaults: {},
+        today: '2026-10-05',
+      },
+      'base',
+      years,
+    ).assetTotals;
+  const assets = [asset('equity', 1000000, 12), asset('fd', 1000000, 7), asset('gold', 500000, undefined)]; // gold: no rate, held flat
 
   it('compounds each asset at its own rate and sums them', () => {
-    const rows = calculateFamilyProjection(assets, 10);
-    const expected =
-      calculateFutureValue(1000000, 12, 10) + calculateFutureValue(1000000, 7, 10) + 500000;
-    expect(rows[0]!.value).toBe(2500000);
-    expect(rows[10]!.value).toBeCloseTo(expected, 1);
+    const totals = project(assets, 10);
+    const expected = calculateFutureValue(1000000, 12, 10) + calculateFutureValue(1000000, 7, 10) + 500000;
+    expect(totals[0]).toBe(2500000);
+    expect(totals[10]).toBeCloseTo(expected, 1);
   });
 
   it('differs from applying one blended rate to the whole portfolio', () => {
-    const perAsset = calculateFamilyProjection(assets.slice(0, 2), 20).at(-1)!.value;
+    const perAsset = project(assets.slice(0, 2), 20).at(-1)!;
     const blended = calculateFutureValue(2000000, 9.5, 20); // simple average rate
     expect(perAsset).toBeGreaterThan(blended);
   });
 
-  it('growth column sums to the total change', () => {
-    const rows = calculateFamilyProjection(assets, 25);
+  it('yearly growth (as shown in the table) sums to the total change', () => {
+    const rows = roundRowsToRupees(project(assets, 25).map((value, year) => ({ year, value, growth: null })));
     const growth = rows.reduce((s, r) => s + (r.growth ?? 0), 0);
-    expect(Math.round(growth * 100) / 100).toBe(Math.round((rows[25]!.value - rows[0]!.value) * 100) / 100);
+    expect(growth).toBe(rows[25]!.value - rows[0]!.value);
   });
 
   it('is empty-safe', () => {
-    expect(calculateFamilyProjection([], 3).map((r) => r.value)).toEqual([0, 0, 0, 0]);
+    expect(project([], 3)).toEqual([0, 0, 0, 0]);
   });
 
   it('describes the implied overall rate', () => {

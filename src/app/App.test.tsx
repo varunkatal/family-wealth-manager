@@ -28,14 +28,14 @@ describe('App shell', () => {
     renderApp();
     const nav = screen.getByRole('navigation', { name: 'Main' });
     await user.click(within(nav).getByRole('link', { name: 'Settings' }));
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
     await user.click(within(nav).getByRole('link', { name: 'Dashboard' }));
     expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument();
   });
 
-  it('loads a route directly (as on refresh)', () => {
+  it('loads a route directly (as on refresh)', async () => {
     renderApp('/settings');
-    expect(screen.getByRole('heading', { name: 'Settings' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument();
   });
 
   it('shows a not-found page for unknown routes', () => {

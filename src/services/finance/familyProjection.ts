@@ -4,6 +4,7 @@ import { projectTotalDebtByYear, type LoanTerms } from './loans';
 import { projectByYear } from './projection';
 import { resolveAssetRate, type ClassDefaults, type RateSource, type Scenario } from './scenarios';
 import type { SIPYearRow } from './sip';
+import { roundToPaise } from './rounding';
 
 type ProjAsset = Parameters<typeof resolveAssetRate>[0] & { id: string; name: string; currentValue: number };
 type ProjContribution = Parameters<typeof projectContributions>[0][number];
@@ -43,7 +44,6 @@ export type FamilyProjection<A, C> = {
   netWorth: number[];
 };
 
-const roundToPaise = (n: number) => Math.round(n * 100) / 100;
 
 /**
  * Projects family wealth under one scenario: each family-owned asset compounds at its own

@@ -1,4 +1,5 @@
 import { familyOwnedValueOf, sharesByAsset } from './netWorth';
+import { roundToPaise } from './rounding';
 
 /**
  * Allocation breakdowns for the dashboard (spec §11, §22). Pure functions.
@@ -12,14 +13,13 @@ type Ownership = { assetId: string; familyMemberId: string; percentage: number }
 
 export type Slice<K extends string = string> = { key: K; value: number; percentage: number };
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 const ownershipIndex = sharesByAsset;
 const familyValue = (asset: { currentValue: number }, owners: Ownership[]) => familyOwnedValueOf(asset.currentValue, owners);
 
 /** The family-owned value of one asset (value × total family share, capped at 100%). */
 export function calculateFamilyOwnedValue(asset: { id: string; currentValue: number }, ownerships: Ownership[]): number {
-  return round2(familyValue(asset, ownerships.filter((o) => o.assetId === asset.id)));
+  return roundToPaise(familyValue(asset, ownerships.filter((o) => o.assetId === asset.id)));
 }
 
 /** Groups values by key, adds percentages of the total, largest first. Zero-value groups are dropped. */
@@ -29,7 +29,7 @@ function toSlices<K extends string>(entries: [K, number][]): Slice<K>[] {
   const total = [...totals.values()].reduce((s, v) => s + v, 0);
   return [...totals.entries()]
     .filter(([, value]) => value > 0)
-    .map(([key, value]) => ({ key, value: round2(value), percentage: total > 0 ? (value / total) * 100 : 0 }))
+    .map(([key, value]) => ({ key, value: roundToPaise(value), percentage: total > 0 ? (value / total) * 100 : 0 }))
     .sort((a, b) => b.value - a.value || a.key.localeCompare(b.key));
 }
 
@@ -66,7 +66,7 @@ export type RankedAsset<A> = { asset: A; familyValue: number; percentage: number
 export function calculateTopAssets<A extends AllocAsset>(assets: A[], ownerships: Ownership[], limit = 5): RankedAsset<A>[] {
   const byAsset = ownershipIndex(ownerships);
   const ranked = assets
-    .map((asset) => ({ asset, familyValue: round2(familyValue(asset, byAsset.get(asset.id) ?? [])) }))
+    .map((asset) => ({ asset, familyValue: roundToPaise(familyValue(asset, byAsset.get(asset.id) ?? [])) }))
     .filter((r) => r.familyValue > 0);
   const total = ranked.reduce((s, r) => s + r.familyValue, 0);
   return ranked

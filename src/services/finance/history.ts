@@ -3,9 +3,10 @@
  * from current data, so historical values stay as they were.
  */
 
+import { roundToPaise } from './rounding';
+
 type Dated = { date: string; createdAt?: string };
 
-const roundToPaise = (n: number) => Math.round(n * 100) / 100;
 
 /** Change from `previous` to `current`, and as a % of the previous value (null when previous is 0). */
 export function calculateChange(previous: number, current: number): { change: number; percentage: number | null } {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Disclaimer } from '../components/Disclaimer';
 import { Icon } from '../components/Icon';
@@ -114,7 +114,9 @@ export function Layout() {
 
         <main className="flex-1 px-4 py-6 md:px-8 md:py-8">
           <div className="mx-auto max-w-6xl">
-            <Outlet />
+            <Suspense fallback={<p className="text-sm text-slate-500">Loading…</p>}>
+              <Outlet />
+            </Suspense>
           </div>
         </main>
 

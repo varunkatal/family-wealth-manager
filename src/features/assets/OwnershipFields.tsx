@@ -6,6 +6,7 @@ import type { FamilyMember } from '../../models/familyMember';
 import { calculateOwnershipValue } from '../../services/finance/netWorth';
 import { formatINRExact } from '../../utils/currency';
 import { parsePercent } from '../../utils/formInput';
+import { roundToPaise } from '../../services/finance/rounding';
 
 export type OwnerRow = { memberId: string; percentage: string };
 
@@ -20,12 +21,11 @@ type OwnershipFieldsProps = {
 
 export { parsePercent };
 
-const round2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Equal shares that add up to exactly 100, e.g. 33.33 / 33.33 / 33.34. */
 export function equalShares(count: number): string[] {
   const base = Math.floor(10000 / count) / 100;
-  return Array.from({ length: count }, (_, i) => String(i === count - 1 ? round2(100 - base * (count - 1)) : base));
+  return Array.from({ length: count }, (_, i) => String(i === count - 1 ? roundToPaise(100 - base * (count - 1)) : base));
 }
 
 /** Initial owner rows for a new asset: the only active member at 100%, else one blank row. */
@@ -49,7 +49,7 @@ export function OwnershipFields({ rows, onChange, members, assetValue, error }: 
 
   const addOwner = () => {
     const next = options.find((m) => !selectedIds.has(m.id));
-    onChange([...rows, { memberId: next?.id ?? '', percentage: String(Math.max(round2(100 - total), 0)) }]);
+    onChange([...rows, { memberId: next?.id ?? '', percentage: String(Math.max(roundToPaise(100 - total), 0)) }]);
   };
 
   if (members.length === 0) {
@@ -127,9 +127,9 @@ export function OwnershipFields({ rows, onChange, members, assetValue, error }: 
         )}
         <span className="ml-auto text-sm" aria-live="polite">
           Family share{' '}
-          <strong className={total > 100.001 ? 'text-red-600 dark:text-red-400' : ''}>{round2(total)}%</strong>
+          <strong className={total > 100.001 ? 'text-red-600 dark:text-red-400' : ''}>{roundToPaise(total)}%</strong>
           {total > 0 && total < 99.999 && (
-            <span className="text-slate-500 dark:text-slate-400"> · {round2(100 - total)}% owned outside the family</span>
+            <span className="text-slate-500 dark:text-slate-400"> · {roundToPaise(100 - total)}% owned outside the family</span>
           )}
         </span>
       </div>

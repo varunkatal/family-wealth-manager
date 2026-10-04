@@ -3,7 +3,8 @@
  * Each asset compounds at its own annual rate; one rate is never applied to the whole portfolio.
  */
 
-const roundToPaise = (n: number) => Math.round(n * 100) / 100;
+import { roundToPaise } from './rounding';
+
 
 /** FV = PV × (1 + r)^n, with r as a percentage (10 means 10%). Rounded to paise. */
 export function calculateFutureValue(presentValue: number, annualRatePct: number, years: number): number {
@@ -21,25 +22,6 @@ export type ProjectionRow = {
 /** Value at the end of each year from today (year 0) to `years`, for one rate. */
 export function projectByYear(presentValue: number, annualRatePct: number, years: number): ProjectionRow[] {
   return toRows(Array.from({ length: years + 1 }, (_, y) => presentValue * (1 + annualRatePct / 100) ** y));
-}
-
-export type ProjectionInput = {
-  id: string;
-  /** Today's value to project (the family-owned value). */
-  presentValue: number;
-  /** Annual growth %, or undefined when no rate is set: then the value is held flat. */
-  annualRatePct: number | undefined;
-};
-
-/**
- * Family total for each year: the sum of every asset compounded at its own rate.
- * Assets without a rate are held at today's value (the caller flags them).
- */
-export function calculateFamilyProjection(assets: ProjectionInput[], years: number): ProjectionRow[] {
-  const totals = Array.from({ length: years + 1 }, (_, y) =>
-    assets.reduce((sum, a) => sum + a.presentValue * (1 + (a.annualRatePct ?? 0) / 100) ** y, 0),
-  );
-  return toRows(totals);
 }
 
 /** Rounds each year's value to paise; growth is the difference of the rounded values, so columns reconcile. */

@@ -4,8 +4,8 @@
  * annual rate / 12, and money already saved compounding yearly like an asset.
  */
 import { calculateFutureValue } from './projection';
+import { roundToPaise } from './rounding';
 
-const roundToPaise = (n: number) => Math.round(n * 100) / 100;
 
 /** Remaining Amount = Target Amount − Current Saved Amount (never below 0). */
 export function calculateRemainingAmount(target: number, saved: number): number {

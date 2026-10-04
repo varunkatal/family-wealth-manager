@@ -1,3 +1,4 @@
+import { DEFAULT_SETTINGS } from '../models/settings';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -220,7 +221,7 @@ describe('Assets page', () => {
   });
 
   it('uses the lakh/crore number format when chosen in Settings', async () => {
-    await saveSettings({ theme: 'system', numberFormat: 'compact' });
+    await saveSettings({ ...DEFAULT_SETTINGS, numberFormat: 'compact' });
     const user = userEvent.setup();
     renderAssets();
     await addManualAsset(user, { name: 'Example Property', cls: 'Real Estate', value: '25,00,000', liquidity: 'Illiquid', open: /Add your first asset/ });

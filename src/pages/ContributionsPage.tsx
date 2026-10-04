@@ -92,7 +92,7 @@ export function ContributionsPage() {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {contributions.map((c) => {
-                  const { rate, source } = resolveContributionRate(c, assetsById);
+                  const { rate, source } = resolveContributionRate(c, assetsById, 'base', settings.classDefaults);
                   const linked = c.linkedAssetId ? assetsById.get(c.linkedAssetId) : undefined;
                   const label = status(c);
                   return (

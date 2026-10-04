@@ -4,24 +4,23 @@ import { useSettings } from '../app/SettingsContext';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
+import { LineChart } from '../components/charts/LineChart';
 import { inputClass } from '../components/FormField';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
 import { SegmentedControl } from '../components/SegmentedControl';
 import { useWealthData } from '../hooks/useWealthData';
 import type { Asset } from '../models/asset';
-import { calculateFamilyOwnedValue } from '../services/finance/allocation';
-import { projectContributions } from '../services/finance/contributionProjection';
-import { analyseLoan, projectTotalDebtByYear } from '../services/finance/loans';
+import { projectFamilyWealth, type ProjectedAsset } from '../services/finance/familyProjection';
+import { analyseLoan } from '../services/finance/loans';
+import { calculateImpliedAnnualRate, projectByYear, roundRowsToRupees, type ProjectionRow } from '../services/finance/projection';
 import {
-  calculateFamilyProjection,
-  calculateFutureValue,
-  calculateImpliedAnnualRate,
-  projectByYear,
-  roundRowsToRupees,
-  type ProjectionRow,
-} from '../services/finance/projection';
-import { formatINR } from '../utils/currency';
+  calculateInflationAdjustedValue,
+  SCENARIO_LABELS,
+  SCENARIOS,
+  type Scenario,
+} from '../services/finance/scenarios';
+import { formatINR, formatINRCompact } from '../utils/currency';
 import { todayISODate } from '../utils/date';
 
 const PRESETS = ['1', '3', '5', '10', '15', '20', '25'] as const;
@@ -32,8 +31,20 @@ const PERIOD_OPTIONS: { value: PeriodChoice; label: string }[] = [
   ...PRESETS.map((p) => ({ value: p, label: `${p}Y` })),
   { value: 'custom', label: 'Custom' },
 ];
-
-type Projected = { asset: Asset; today: number; future: number; rate: number | undefined };
+const SCENARIO_OPTIONS = SCENARIOS.map((s) => ({ value: s, label: SCENARIO_LABELS[s] }));
+type ValueMode = 'nominal' | 'real';
+const MODE_OPTIONS: { value: ValueMode; label: string }[] = [
+  { value: 'nominal', label: 'Nominal' },
+  { value: 'real', label: "Today's money" },
+];
+/** Milestones in the scenario comparison table (spec §15). */
+const COMPARISON_YEARS = [0, 5, 10, 20];
+/** Fixed colour per scenario (validated adjacent pairs of the chart palette). */
+const SCENARIO_COLORS: Record<Scenario, string> = {
+  conservative: 'var(--series-1)',
+  base: 'var(--series-2)',
+  optimistic: 'var(--series-3)',
+};
 
 export function ProjectionsPage() {
   const { assets, ownerships, contributions, liabilities, wealth, loading, error } = useWealthData();
@@ -42,51 +53,54 @@ export function ProjectionsPage() {
   const fmt = (n: number) => formatINR(Math.round(n), settings.numberFormat);
   const [choice, setChoice] = useState<PeriodChoice>('10');
   const [customText, setCustomText] = useState('30');
-  const [detail, setDetail] = useState<Projected | null>(null);
+  const [scenario, setScenario] = useState<Scenario>('base');
+  const [mode, setMode] = useState<ValueMode>('nominal');
+  const [detail, setDetail] = useState<ProjectedAsset<Asset> | null>(null);
 
   const customYears = Number(customText);
   const customValid = Number.isInteger(customYears) && customYears >= 1 && customYears <= MAX_YEARS;
   const years = choice === 'custom' ? (customValid ? customYears : null) : Number(choice);
+  const inflation = settings.inflationRate;
+  /** A year-`y` amount in the chosen mode: as is, or in today's money. */
+  const adj = (v: number, y: number) => (mode === 'real' ? calculateInflationAdjustedValue(v, inflation, y) : v);
 
-  // Project the family-owned value of every owned asset at its own Base rate.
-  const owned = assets
-    .map((asset) => ({ asset, today: calculateFamilyOwnedValue(asset, ownerships), rate: asset.baseGrowthRate }))
-    .filter((a) => a.today > 0);
-  const projected: Projected[] = owned
-    .map((a) => ({ ...a, future: years === null ? a.today : calculateFutureValue(a.today, a.rate ?? 0, years) }))
-    .sort((a, b) => b.future - a.future || a.asset.name.localeCompare(b.asset.name));
-  const withoutRate = owned.filter((a) => a.rate === undefined);
-  const assetRows =
+  // One projection per scenario, long enough for both the chosen period and the comparison table.
+  const horizon = Math.max(years ?? 0, ...COMPARISON_YEARS);
+  const input = { assets, ownerships, contributions, liabilities, classDefaults: settings.classDefaults, today: todayISODate() };
+  const byScenario = Object.fromEntries(SCENARIOS.map((s) => [s, projectFamilyWealth(input, s, horizon)])) as Record<
+    Scenario,
+    ReturnType<typeof projectFamilyWealth<Asset, (typeof contributions)[number]>>
+  >;
+  const p = byScenario[scenario];
+  const hasContributions = contributions.length > 0;
+  const assetsWithoutRate = p.assets.filter((a) => a.rate === undefined);
+  const contributionsWithoutRate = p.contributions.filter((c) => c.rate === undefined);
+  const unplannedLoans = liabilities.filter((l) => analyseLoan(l).kind !== 'schedule');
+
+  const rows: ProjectionRow[] =
     years === null
       ? []
-      : calculateFamilyProjection(
-          owned.map((a) => ({ id: a.asset.id, presentValue: a.today, annualRatePct: a.rate })),
-          years,
-        );
-  // Future regular investments (only those made after today), each at its own rate.
-  const assetsById = new Map(assets.map((a) => [a.id, a]));
-  const contributed = years === null ? null : projectContributions(contributions, assetsById, years, todayISODate());
-  const contributionsWithoutRate = contributed?.byContribution.filter((b) => b.rate === undefined) ?? [];
-  const hasContributions = contributions.length > 0;
-  const rows = roundRowsToRupees(
-    assetRows.map((r, y) => ({ year: r.year, value: r.value + (contributed?.rows[y]?.value ?? 0), growth: null })),
-  );
+      : roundRowsToRupees(p.totalAssets.slice(0, years + 1).map((v, y) => ({ year: y, value: adj(v, y), growth: null })));
   const final = rows.at(-1);
-  // Loans reduce along their repayment schedules; loans without one are held flat.
-  const debt = years === null ? [] : projectTotalDebtByYear(liabilities, years).map(Math.round);
-  const unplannedLoans = liabilities.filter((l) => analyseLoan(l).kind !== 'schedule');
-  const assetsFinal = assetRows.at(-1)?.value ?? 0;
-  const contributedFinal = contributed?.rows.at(-1);
+  const nominalFinal = years === null ? 0 : Math.round(p.totalAssets[years]!);
+  const realFinal = years === null ? 0 : Math.round(calculateInflationAdjustedValue(p.totalAssets[years]!, inflation, years));
+  const projectedAssets =
+    years === null
+      ? []
+      : [...p.assets].sort((a, b) => b.values[years]! - a.values[years]! || a.asset.name.localeCompare(b.asset.name));
   // A single "overall rate" is only meaningful without new money coming in.
   const implied =
-    final && years && !hasContributions ? calculateImpliedAnnualRate(rows[0]!.value, final.value, years) : null;
+    years && !hasContributions ? calculateImpliedAnnualRate(p.totalAssets[0]!, p.totalAssets[years]!, years) : null;
   const currentYear = new Date().getFullYear();
+  const comparisonYears = [...new Set([...COMPARISON_YEARS, ...(years ? [years] : [])])].sort((a, b) => a - b);
+  const yearLabel = (y: number) => (y === 0 ? 'Today' : `${y} ${y === 1 ? 'year' : 'years'}`);
+  const scenarioName = SCENARIO_LABELS[scenario];
 
   return (
     <>
       <PageHeader
         title="Projections"
-        description="How the family's assets could grow, using each asset's own Base growth rate."
+        description="How family wealth could grow, using each asset's own growth rate under each scenario."
       />
 
       {error && (
@@ -97,7 +111,7 @@ export function ProjectionsPage() {
 
       {loading ? (
         <p className="text-sm text-slate-500">Loading…</p>
-      ) : owned.length === 0 && !hasContributions ? (
+      ) : p.assets.length === 0 && !hasContributions ? (
         <Card className="py-10 text-center">
           <h2 className="font-medium">Nothing to project yet</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-600 dark:text-slate-400">
@@ -129,15 +143,25 @@ export function ProjectionsPage() {
               </label>
             )}
           </div>
+          <div className="mb-6 flex flex-wrap items-center gap-3">
+            <SegmentedControl name="scenario" label="Scenario" options={SCENARIO_OPTIONS} value={scenario} onChange={setScenario} />
+            <SegmentedControl name="mode" label="Show values" options={MODE_OPTIONS} value={mode} onChange={setMode} />
+          </div>
 
-          {withoutRate.length > 0 && (
+          {assetsWithoutRate.length > 0 && (
             <div role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">
               <strong>
-                {withoutRate.length} {withoutRate.length === 1 ? 'asset has' : 'assets have'} no Base growth rate
+                {assetsWithoutRate.length} {assetsWithoutRate.length === 1 ? 'asset has' : 'assets have'} no {scenarioName}{' '}
+                growth rate
               </strong>{' '}
-              and {withoutRate.length === 1 ? 'is' : 'are'} held at today's value: {withoutRate.map((a) => a.asset.name).join(', ')}.{' '}
+              and {assetsWithoutRate.length === 1 ? 'is' : 'are'} held at today's value:{' '}
+              {assetsWithoutRate.map((a) => a.asset.name).join(', ')}.{' '}
               <Link to="/assets" className="font-medium underline">
                 Add rates on the Assets page
+              </Link>{' '}
+              or set class defaults in{' '}
+              <Link to="/settings" className="font-medium underline">
+                Settings
               </Link>
             </div>
           )}
@@ -165,25 +189,28 @@ export function ProjectionsPage() {
             <>
               <Card>
                 <p className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                  Family assets in {years} {years === 1 ? 'year' : 'years'} ({currentYear + years})
+                  Family assets in {years} {years === 1 ? 'year' : 'years'} ({currentYear + years}) · {scenarioName}
                 </p>
                 <p data-testid="projected-total" className="mt-1 text-5xl font-semibold tracking-tight">
-                  {fmt(final.value)}
+                  {fmt(nominalFinal)}
                 </p>
                 <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-slate-100 pt-4 text-sm dark:border-slate-800">
-                  <Stat label="Today" value={fmt(rows[0]!.value)} />
-                  <Stat label={hasContributions ? 'Change' : 'Growth'} value={`${final.value - rows[0]!.value >= 0 ? '+' : ''}${fmt(final.value - rows[0]!.value)}`} />
+                  <Stat label="Today" value={fmt(p.totalAssets[0]!)} />
+                  <Stat
+                    label="In today's money"
+                    value={<span data-testid="projected-real">{fmt(realFinal)}</span>}
+                  />
                   {implied !== null && <Stat label="Overall rate" value={`${implied.toFixed(2)}% a year`} />}
-                  {hasContributions && contributedFinal && (
+                  {hasContributions && (
                     <>
-                      <Stat label="Existing assets grow to" value={fmt(assetsFinal)} />
+                      <Stat label="Existing assets grow to" value={fmt(p.assetTotals[years]!)} />
                       <Stat
                         label="Future investments"
                         value={
                           <span data-testid="projected-contributions">
-                            {fmt(contributedFinal.value)}
+                            {fmt(p.contributionTotals[years]!.value)}
                             <span className="ml-1 text-xs font-normal text-slate-500 dark:text-slate-400">
-                              from {fmt(contributedFinal.invested)} invested
+                              from {fmt(p.contributionTotals[years]!.invested)} invested
                             </span>
                           </span>
                         }
@@ -192,10 +219,66 @@ export function ProjectionsPage() {
                   )}
                 </dl>
                 <p className="mt-4 text-xs text-slate-500 dark:text-slate-400">
-                  Family's share of each asset, compounded yearly at that asset's Base rate
-                  {hasContributions && ', plus regular investments made from today at their expected return'}, rounded
-                  to the nearest rupee.
+                  Family's share of each asset, compounded yearly at that asset's {scenarioName} rate
+                  {hasContributions && ', plus regular investments made from today at their expected return'}. "Today's
+                  money" divides by {inflation}% inflation a year (change it in Settings). Rounded to the nearest rupee.
                 </p>
+              </Card>
+
+              <Card className="mt-6">
+                <h2 className="font-semibold">Scenarios compared</h2>
+                <p className="mt-0.5 text-sm text-slate-500 dark:text-slate-400">
+                  Projected net worth (assets, future investments, minus loans)
+                  {mode === 'real' ? " in today's money" : ''}.
+                </p>
+                {years > 0 && (
+                  <div className="mt-4">
+                    <LineChart
+                      label={`Projected net worth by scenario over ${years} years`}
+                      series={SCENARIOS.map((s) => ({
+                        key: s,
+                        label: SCENARIO_LABELS[s],
+                        color: SCENARIO_COLORS[s],
+                        values: byScenario[s].netWorth.slice(0, years + 1).map((v, y) => Math.round(adj(v, y))),
+                      }))}
+                      xLabels={Array.from({ length: years + 1 }, (_, y) => (y === 0 ? 'Today' : `${currentYear + y}`))}
+                      format={fmt}
+                      formatAxis={(n) => formatINRCompact(n).replace(' Lakh', 'L').replace(' Crore', 'Cr')}
+                    />
+                  </div>
+                )}
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <caption className="sr-only">Scenario comparison</caption>
+                    <thead className="text-xs text-slate-500 dark:text-slate-400">
+                      <tr>
+                        <th scope="col" className="pb-1 text-left font-normal">Period</th>
+                        {SCENARIOS.map((s) => (
+                          <th key={s} scope="col" className="pb-1 text-right font-normal">
+                            {SCENARIO_LABELS[s]}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {comparisonYears.map((y) => (
+                        <tr key={y} className="border-t border-slate-100 dark:border-slate-800">
+                          <th scope="row" className="whitespace-nowrap py-1.5 text-left font-normal">
+                            {yearLabel(y)}
+                          </th>
+                          {SCENARIOS.map((s) => (
+                            <td
+                              key={s}
+                              className={`whitespace-nowrap py-1.5 pl-2 text-right tabular-nums ${s === scenario ? 'font-semibold' : ''}`}
+                            >
+                              {fmt(adj(byScenario[s].netWorth[y]!, y))}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </Card>
 
               {liabilities.length > 0 && (
@@ -213,8 +296,11 @@ export function ProjectionsPage() {
                     </p>
                   )}
                   <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
-                    <Stat label={`Loans in ${years}Y`} value={<span data-testid="projected-debt">{fmt(debt.at(-1)!)}</span>} />
-                    <Stat label={`Net worth in ${years}Y`} value={<span data-testid="projected-net-worth">{fmt(final.value - debt.at(-1)!)}</span>} />
+                    <Stat label={`Loans in ${years}Y`} value={<span data-testid="projected-debt">{fmt(adj(p.debt[years]!, years))}</span>} />
+                    <Stat
+                      label={`Net worth in ${years}Y`}
+                      value={<span data-testid="projected-net-worth">{fmt(adj(p.netWorth[years]!, years))}</span>}
+                    />
                   </dl>
                   <table className="mt-4 w-full text-sm">
                     <caption className="sr-only">Net worth by year</caption>
@@ -232,9 +318,9 @@ export function ProjectionsPage() {
                           <th scope="row" className="py-1.5 text-left font-normal">
                             {r.year === 0 ? 'Today' : `Year ${r.year}`}
                           </th>
-                          <td className="hidden py-1.5 text-right tabular-nums sm:table-cell">{fmt(r.value)}</td>
-                          <td className="py-1.5 text-right tabular-nums text-slate-500 dark:text-slate-400">{fmt(debt[r.year]!)}</td>
-                          <td className="py-1.5 text-right font-medium tabular-nums">{fmt(r.value - debt[r.year]!)}</td>
+                          <td className="hidden py-1.5 text-right tabular-nums sm:table-cell">{fmt(adj(p.totalAssets[r.year]!, r.year))}</td>
+                          <td className="py-1.5 text-right tabular-nums text-slate-500 dark:text-slate-400">{fmt(adj(p.debt[r.year]!, r.year))}</td>
+                          <td className="py-1.5 text-right font-medium tabular-nums">{fmt(adj(p.netWorth[r.year]!, r.year))}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -245,6 +331,7 @@ export function ProjectionsPage() {
               <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
                 <Card>
                   <h2 className="font-semibold">Family total by year</h2>
+                  {mode === 'real' && <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">In today's money</p>}
                   <div className="mt-3">
                     <ProjectionTable
                       rows={rows}
@@ -256,7 +343,7 @@ export function ProjectionsPage() {
                   </div>
                 </Card>
 
-                {projected.length > 0 && (
+                {projectedAssets.length > 0 && (
                   <Card padded={false} className="overflow-hidden">
                     <div className="px-5 pt-5">
                       <h2 className="font-semibold">By asset</h2>
@@ -273,25 +360,30 @@ export function ProjectionsPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {projected.map((p) => (
-                          <tr key={p.asset.id}>
+                        {projectedAssets.map((a) => (
+                          <tr key={a.asset.id}>
                             <th scope="row" className="px-4 py-2.5 text-left font-normal">
                               <button
                                 type="button"
-                                onClick={() => setDetail(p)}
+                                onClick={() => setDetail(a)}
                                 className="text-left font-medium hover:text-teal-700 hover:underline dark:hover:text-teal-400"
                               >
-                                {p.asset.name}
+                                {a.asset.name}
                               </button>
-                              <span className="block text-xs text-slate-500 dark:text-slate-400">{p.asset.assetClass}</span>
+                              <span className="block text-xs text-slate-500 dark:text-slate-400">{a.asset.assetClass}</span>
                             </th>
                             <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums">
-                              {p.rate === undefined ? <Badge tone="notice">No rate</Badge> : `${p.rate}%`}
+                              {a.rate === undefined ? <Badge tone="notice">No rate</Badge> : `${a.rate}%`}
+                              {a.source === 'default' && (
+                                <span className="block text-xs text-slate-500 dark:text-slate-400">class default</span>
+                              )}
                             </td>
                             <td className="hidden whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-slate-500 sm:table-cell dark:text-slate-400">
-                              {fmt(p.today)}
+                              {fmt(a.today)}
                             </td>
-                            <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium tabular-nums">{fmt(p.future)}</td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium tabular-nums">
+                              {fmt(adj(a.values[years]!, years))}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -300,7 +392,7 @@ export function ProjectionsPage() {
                 )}
               </div>
 
-              {contributed && contributed.byContribution.length > 0 && (
+              {p.contributions.length > 0 && (
                 <Card padded={false} className="mt-6 overflow-hidden">
                   <div className="px-5 pt-5">
                     <h2 className="font-semibold">Regular investments</h2>
@@ -319,16 +411,16 @@ export function ProjectionsPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                      {contributed.byContribution.map(({ contribution: c, rate, rows: r }) => (
+                      {p.contributions.map(({ contribution: c, rate, rows: r }) => (
                         <tr key={c.id}>
                           <th scope="row" className="px-4 py-2.5 text-left font-medium">{c.name}</th>
                           <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums">
                             {rate === undefined ? <Badge tone="notice">No rate</Badge> : `${rate}%`}
                           </td>
                           <td className="hidden whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-slate-500 sm:table-cell dark:text-slate-400">
-                            {fmt(r.at(-1)!.invested)}
+                            {fmt(r[years]!.invested)}
                           </td>
-                          <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium tabular-nums">{fmt(r.at(-1)!.value)}</td>
+                          <td className="whitespace-nowrap px-4 py-2.5 text-right font-medium tabular-nums">{fmt(adj(r[years]!.value, years))}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -344,10 +436,11 @@ export function ProjectionsPage() {
         <Modal title={detail.asset.name} onClose={() => setDetail(null)}>
           <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">
             {detail.rate === undefined ? (
-              <>No Base growth rate set, so the value is held flat. Edit the asset to add one.</>
+              <>No {scenarioName} growth rate set, so the value is held flat. Edit the asset to add one.</>
             ) : (
               <>
-                Family's share of {fmt(detail.today)}, growing at {detail.rate}% a year.
+                Family's share of {fmt(detail.today)}, growing at {detail.rate}% a year ({scenarioName}
+                {detail.source === 'default' ? ', class default from Settings' : ''}).
               </>
             )}
           </p>

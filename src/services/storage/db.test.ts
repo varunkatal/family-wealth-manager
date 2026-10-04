@@ -15,6 +15,6 @@ describe('database upgrade', () => {
     await closeDb();
     const db = await getDb();
     expect([...db.objectStoreNames]).toEqual(expect.arrayContaining(['settings', 'familyMembers', 'assets', 'assetOwnerships', 'liabilities']));
-    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'exact' });
+    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'exact', inflationRate: 6, classDefaults: {} });
   });
 });

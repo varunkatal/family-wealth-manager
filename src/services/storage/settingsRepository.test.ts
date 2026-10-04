@@ -8,15 +8,15 @@ describe('settingsRepository', () => {
   });
 
   it('saves settings and reads them back after reopening the database', async () => {
-    await saveSettings({ theme: 'dark', numberFormat: 'compact' });
+    await saveSettings({ ...DEFAULT_SETTINGS, theme: 'dark', numberFormat: 'compact', inflationRate: 5.5, classDefaults: { Equity: { base: 11 } } });
     await closeDb(); // simulates a page refresh
-    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'compact' });
+    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'compact', inflationRate: 5.5, classDefaults: { Equity: { base: 11 } } });
   });
 
   it('loads settings saved before a field existed, keeping stored values', async () => {
     const db = await getDb();
     await db.put('settings', { theme: 'dark' } as unknown as AppSettings, 'app');
-    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'exact' });
+    expect(await getSettings()).toEqual({ ...DEFAULT_SETTINGS, theme: 'dark' }); // older settings gain the new defaults
   });
 
   it('rejects invalid settings without writing them', async () => {

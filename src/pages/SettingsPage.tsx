@@ -2,6 +2,9 @@ import { useSettings } from '../app/SettingsContext';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
 import { SegmentedControl } from '../components/SegmentedControl';
+import { ProjectionSettings } from '../features/settings/ProjectionSettings';
+import { useWealthData } from '../hooks/useWealthData';
+import { getAssetClassOptions } from '../models/assetCategories';
 import type { NumberFormat, ThemePreference } from '../models/settings';
 import { formatINR } from '../utils/currency';
 
@@ -20,6 +23,7 @@ const SAMPLE_AMOUNT = 12500000;
 
 export function SettingsPage() {
   const { settings, loading, updateSettings } = useSettings();
+  const { assets, loading: dataLoading } = useWealthData();
 
   return (
     <>
@@ -57,11 +61,15 @@ export function SettingsPage() {
         </div>
       </Card>
 
+      {loading || dataLoading ? (
+        <p className="mt-6 text-sm text-slate-500">Loading…</p>
+      ) : (
+        <ProjectionSettings settings={settings} assetClasses={getAssetClassOptions(assets)} onSave={updateSettings} />
+      )}
+
       <Card className="mt-6">
         <h2 className="font-medium">More settings coming</h2>
-        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          Default growth rates, inflation, backup and data deletion will be added in later phases.
-        </p>
+        <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">Backup, restore and data deletion will be added in a later phase.</p>
       </Card>
     </>
   );

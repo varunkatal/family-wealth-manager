@@ -4,6 +4,7 @@
  * without the user's say.
  */
 import { countRecords, exportBackup, restoreBackup, type Backup, type RecordStore } from '../storage/backupRepository';
+import { withoutChangeNotifications } from '../storage/changes';
 import { ABOUT_TAB, backupToTabs, isEmptySheet, readSaveId, tabsToBackup, type CellValue } from './sheetFormat';
 import { GoogleApiError, type SheetFile, type SheetsClient } from './sheetsClient';
 
@@ -38,7 +39,7 @@ function canonical(value: unknown): string {
     if (v && typeof v === 'object') {
       return Object.fromEntries(
         Object.entries(v as Record<string, unknown>)
-          .filter(([, x]) => x !== undefined)
+          .filter(([, x]) => x !== undefined && x !== '') // an empty cell reads back as "not set"
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([k, x]) => [k, sort(x)]),
       );
@@ -83,8 +84,20 @@ export async function openFamilySheet(client: SheetsClient, rememberedId: string
   return (await client.findAppSpreadsheet()) ?? (await client.createAppSpreadsheet());
 }
 
-/** Replaces this browser's data with the sheet's (one transaction). */
-export const loadSheetIntoBrowser = (backup: Backup) => restoreBackup(backup);
+/**
+ * After a save was refused because another device saved first: same data (nothing to do),
+ * or different (the user chooses). Never decides on its own which copy wins.
+ */
+export async function planAfterConflict(tabs: Record<string, CellValue[][]>): Promise<Extract<ConnectPlan, { kind: 'in-sync' | 'choose' | 'invalid' }>> {
+  const parsed = tabsToBackup(tabs);
+  if (!parsed.ok) return { kind: 'invalid', errors: parsed.errors };
+  const saveId = readSaveId(tabs[ABOUT_TAB]);
+  if (sameContent(parsed.backup, await exportBackup())) return { kind: 'in-sync', saveId };
+  return { kind: 'choose', backup: parsed.backup, sheet: parsed.counts, local: await countRecords(), saveId };
+}
+
+/** Replaces this browser's data with the sheet's (one transaction). Not a change to save back. */
+export const loadSheetIntoBrowser = (backup: Backup) => withoutChangeNotifications(() => restoreBackup(backup));
 
 export class SheetChangedError extends Error {
   constructor() {

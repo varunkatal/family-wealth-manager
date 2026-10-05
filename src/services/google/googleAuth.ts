@@ -66,7 +66,14 @@ export class SignInError extends Error {
 
 export type GoogleAuth = ReturnType<typeof createGoogleAuth>;
 
-export function createGoogleAuth(clientId: string, loadLib: () => Promise<GoogleOAuth2> = loadGoogleIdentity, now: () => number = Date.now) {
+type AuthOptions = {
+  loadLib?: () => Promise<GoogleOAuth2>;
+  now?: () => number;
+  /** How long to wait for Google's answer after the user comes back to this window. */
+  popupGraceMs?: number;
+};
+
+export function createGoogleAuth(clientId: string, { loadLib = loadGoogleIdentity, now = Date.now, popupGraceMs = 3000 }: AuthOptions = {}) {
   let token: { value: string; expiresAt: number } | null = null;
 
   return {
@@ -81,7 +88,31 @@ export function createGoogleAuth(clientId: string, loadLib: () => Promise<Google
      */
     async signIn(prompt: '' | 'consent' = ''): Promise<void> {
       const lib = await loadLib();
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>((resolveOnce, rejectOnce) => {
+        let settled = false;
+        let graceTimer: ReturnType<typeof setTimeout> | undefined;
+        const onFocus = () => {
+          clearTimeout(graceTimer);
+          graceTimer = setTimeout(() => reject(new SignInError('Google sign-in was cancelled.', true)), popupGraceMs);
+        };
+        const finish = () => {
+          settled = true;
+          clearTimeout(graceTimer);
+          window.removeEventListener('focus', onFocus);
+        };
+        const resolve = () => {
+          if (settled) return;
+          finish();
+          resolveOnce();
+        };
+        const reject = (err: SignInError) => {
+          if (settled) return;
+          finish();
+          rejectOnce(err);
+        };
+        // Google does not always report a popup closed by the user. When this window gets focus back
+        // and no answer follows shortly, treat sign-in as cancelled so the app never waits forever.
+        window.addEventListener('focus', onFocus);
         const client = lib.initTokenClient({
           client_id: clientId,
           scope: DRIVE_FILE_SCOPE,

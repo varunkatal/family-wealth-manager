@@ -5,9 +5,10 @@ import { exportBackup } from '../storage/backupRepository';
 import { createExpense, createIncome } from '../storage/cashFlowRepository';
 import { createContribution } from '../storage/contributionRepository';
 import { loadDemoData } from '../storage/demoRepository';
-import { listFamilyMembers } from '../storage/familyMemberRepository';
+import { createFamilyMember, listFamilyMembers } from '../storage/familyMemberRepository';
 import { createGoal } from '../storage/goalRepository';
 import { saveSettings } from '../storage/settingsRepository';
+import { sameContent } from './sheetSync';
 import { ALL_TAB_TITLES, backupToTabs, columnsOf, isEmptySheet, readSaveId, tabsToBackup, type CellValue, type Tab } from './sheetFormat';
 
 /** What the Sheets API gives back: rows without trailing empty cells, keyed by tab title. */
@@ -71,6 +72,16 @@ describe('Google Sheet format', () => {
     expect(parsed.ok && parsed.backup.data.incomes[0]!.description).toBe('=HYPERLINK("x")');
     expect(parsed.ok && parsed.backup.data.expenses[0]!.notes).toBe('Line 1\nLine 2, with "quotes"');
     expect(parsed.ok && parsed.backup.data.expenses[0]!.amount).toBe(15000.5);
+  });
+
+  it('keeps required fields that were left empty (an empty cell reads back as missing)', async () => {
+    await createFamilyMember({ name: 'Person C', relationship: '', isActive: true, notes: '' });
+    const backup = await exportBackup();
+    const parsed = tabsToBackup(asReadFromSheet(backupToTabs(backup, 'save-1')));
+    expect(parsed.ok).toBe(true);
+    if (!parsed.ok) return;
+    expect(parsed.backup.data.familyMembers[0]!.relationship).toBe('');
+    expect(sameContent(parsed.backup, backup)).toBe(true); // '' and "not set" count as the same
   });
 
   it('reads columns by name, so their order does not matter', async () => {

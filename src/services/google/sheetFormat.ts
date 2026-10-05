@@ -86,8 +86,21 @@ const fromSettingCell = (v: CellValue): unknown => {
   return v;
 };
 
-/** Reads one data tab: header row names the fields; empty cells mean "not set". */
-function readRecords(rows: CellValue[][] | undefined): Record<string, unknown>[] {
+/**
+ * Fields that must be present but may be empty text (e.g. a blank relationship). An empty cell
+ * comes back from Google as missing, so these are read back as '' rather than "not set".
+ */
+const emptyTextFields = Object.fromEntries(
+  STORE_NAMES.map((store) => [
+    store,
+    Object.entries(RECORD_STORES[store].shape as Record<string, { safeParse: (v: unknown) => { success: boolean } }>)
+      .filter(([, field]) => !field.safeParse(undefined).success && field.safeParse('').success)
+      .map(([name]) => name),
+  ]),
+) as Record<RecordStore, string[]>;
+
+/** Reads one data tab: header row names the fields; empty cells mean "not set" (or '' for required text). */
+function readRecords(rows: CellValue[][] | undefined, store?: RecordStore): Record<string, unknown>[] {
   if (!rows || rows.length === 0) return [];
   const [header, ...body] = rows;
   return body
@@ -98,6 +111,7 @@ function readRecords(rows: CellValue[][] | undefined): Record<string, unknown>[]
         const cell = row[i];
         if (typeof name === 'string' && name !== '' && cell !== undefined && cell !== '') record[name] = cell;
       });
+      for (const name of store ? emptyTextFields[store] : []) record[name] ??= '';
       return record;
     });
 }
@@ -112,7 +126,7 @@ export function tabsToBackup(tabs: Record<string, CellValue[][]>): ParsedBackup 
   const settings: Partial<AppSettings> = Object.fromEntries(
     settingsRows.filter((r) => typeof r[0] === 'string' && r[0] !== '').map((r) => [r[0] as string, fromSettingCell(r[1] ?? '')]),
   );
-  const data = Object.fromEntries(STORE_NAMES.map((store) => [store, readRecords(tabs[TAB_TITLES[store]])]));
+  const data = Object.fromEntries(STORE_NAMES.map((store) => [store, readRecords(tabs[TAB_TITLES[store]], store)]));
   return validateBackup({
     app: about.get('App') ?? BACKUP_APP,
     formatVersion: about.get('Format version') ?? BACKUP_FORMAT_VERSION,

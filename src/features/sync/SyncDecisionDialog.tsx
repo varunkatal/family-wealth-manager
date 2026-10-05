@@ -73,10 +73,24 @@ export function SyncDecisionDialog() {
   }
 
   return (
-    <Modal title="Which data do you want to keep?" onClose={cancel} role="alertdialog" size="lg">
+    <Modal
+      title={decision.conflict ? 'Your Google Sheet was changed on another device' : 'Which data do you want to keep?'}
+      onClose={cancel}
+      role="alertdialog"
+      size="lg"
+    >
       <p className="text-sm text-slate-600 dark:text-slate-300">
-        Your Google Sheet <strong>{decision.file.name}</strong> and this browser hold different data. Choose one copy to keep; the
-        other is replaced. Nothing changes until you choose.
+        {decision.conflict ? (
+          <>
+            While you were making changes here, <strong>{decision.file.name}</strong> was saved from another device or browser.
+            Saving has stopped so neither copy is lost. Choose one copy to keep; the other is replaced.
+          </>
+        ) : (
+          <>
+            Your Google Sheet <strong>{decision.file.name}</strong> and this browser hold different data. Choose one copy to keep;
+            the other is replaced. Nothing changes until you choose.
+          </>
+        )}
       </p>
       <div className="mt-4">
         <CountsTable

@@ -61,7 +61,7 @@ describe('Start screen and connecting Google', () => {
     expect(auth!.signIn).toHaveBeenCalledTimes(1);
     expect(drive.client.createAppSpreadsheet).toHaveBeenCalledTimes(1);
     expect(drive.client.writeTabs).toHaveBeenCalledTimes(1);
-    expect(screen.getAllByText(/Google Sheet connected/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Saved to Google Sheet/).length).toBeGreaterThan(0);
     expect(readStorageMode()).toBe('google');
     expect(readRememberedSheet()?.spreadsheetId).toBe(drive.files[0]!.id);
   });
@@ -132,12 +132,13 @@ describe('Start screen and connecting Google', () => {
     renderApp(drive, fakeAuth(), '/data');
     expect(await screen.findByRole('heading', { name: 'Backup & data' })).toBeInTheDocument();
     await user.click(screen.getAllByRole('button', { name: /Sign in to (Google|connect)/ })[0]!);
-    expect(await screen.findByRole('button', { name: 'Save to Google Sheet now' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Save now' })).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Save to Google Sheet now' }));
+    await user.click(screen.getByRole('button', { name: 'Save now' }));
     await waitFor(() => expect(drive.client.writeTabs).toHaveBeenCalledTimes(2)); // first connect + manual save
 
-    await user.click(screen.getByRole('button', { name: 'Disconnect (use this browser only)' }));
+    await user.click(screen.getByRole('button', { name: 'Disconnect…' }));
+    await user.click(within(screen.getByRole('alertdialog')).getByRole('button', { name: 'Disconnect' }));
     expect(await screen.findByRole('button', { name: 'Connect Google Sheet' })).toBeInTheDocument();
     expect(readStorageMode()).toBe('browser');
     expect(readRememberedSheet()).toBeNull();

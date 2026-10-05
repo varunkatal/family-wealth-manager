@@ -1,4 +1,4 @@
-import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
+import { openDB, unwrap, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Asset } from '../../models/asset';
 import type { Expense, Income } from '../../models/cashFlow';
 import type { Contribution } from '../../models/contribution';
@@ -8,6 +8,7 @@ import type { FamilyMember } from '../../models/familyMember';
 import type { Liability } from '../../models/liability';
 import type { AssetOwnership } from '../../models/ownership';
 import type { AppSettings } from '../../models/settings';
+import { notifyDataChanged } from './changes';
 
 export const DB_NAME = 'family-wealth-calculator';
 export const DB_VERSION = 8;
@@ -110,9 +111,21 @@ export function getDb(): Promise<IDBPDatabase<WealthDB>> {
       blocking() {
         void closeDb();
       },
-    });
+    }).then(announceWrites);
   }
   return dbPromise;
+}
+
+/** Signals a data change after every completed read-write transaction, whichever code made it. */
+function announceWrites(db: IDBPDatabase<WealthDB>): IDBPDatabase<WealthDB> {
+  const raw = unwrap(db) as IDBDatabase;
+  const transaction = raw.transaction.bind(raw);
+  raw.transaction = ((stores: string | string[], mode?: IDBTransactionMode, options?: IDBTransactionOptions) => {
+    const tx = transaction(stores, mode, options);
+    if (mode === 'readwrite') tx.addEventListener('complete', notifyDataChanged);
+    return tx;
+  }) as IDBDatabase['transaction'];
+  return db;
 }
 
 /** Closes the connection so the database can be deleted or reopened (used in tests). */

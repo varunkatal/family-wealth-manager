@@ -50,10 +50,13 @@ export function fakeDrive() {
   return { client, files, sheets, seed };
 }
 
-/** Google sign-in that always succeeds, without a popup. */
-export function fakeAuth(): GoogleAuth {
+/** Google sign-in that always succeeds, without a popup. `expire()` simulates the hourly token expiry. */
+export function fakeAuth(): GoogleAuth & { expire: () => void } {
   let signedIn = false;
   return {
+    expire: () => {
+      signedIn = false;
+    },
     preload: vi.fn(),
     signIn: vi.fn(async () => {
       signedIn = true;

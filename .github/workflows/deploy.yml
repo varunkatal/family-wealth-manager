@@ -28,19 +28,21 @@ jobs:
           cache: npm
       - name: Check the Google Client ID variable
         env:
-          ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
+          RAW_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
         run: |
+          # Tolerate copy-paste extras: spaces, line breaks, quotes, or the "VITE_GOOGLE_CLIENT_ID=" prefix.
+          ID=$(printf '%s' "$RAW_ID" | tr -d " \t\r\n\"'" | sed 's/^VITE_GOOGLE_CLIENT_ID=//')
           if [ -z "$ID" ]; then
             echo "::warning::VITE_GOOGLE_CLIENT_ID is not set: the site will work in browser-only mode."
-          elif ! echo "$ID" | grep -Eq '^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$'; then
-            echo "::error::VITE_GOOGLE_CLIENT_ID must be only the Client ID (like 123-abc.apps.googleusercontent.com), without the name, '=', quotes or spaces."
+          elif ! printf '%s' "$ID" | grep -Eq '^[0-9]+-[a-z0-9]+\.apps\.googleusercontent\.com$'; then
+            echo "::error::VITE_GOOGLE_CLIENT_ID is not a Google Client ID (expected like 123-abc.apps.googleusercontent.com; got ${#ID} characters starting '$(printf '%s' "$ID" | cut -c1-12)')."
             exit 1
           fi
+          echo "VITE_GOOGLE_CLIENT_ID=$ID" >> "$GITHUB_ENV"
       - run: npm ci
       - run: npm test
       - run: npm run build
         env:
-          VITE_GOOGLE_CLIENT_ID: ${{ vars.VITE_GOOGLE_CLIENT_ID }}
           BASE_PATH: /${{ github.event.repository.name }}/
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,3 +1,4 @@
+import { loadEnv } from 'vite';
 import { defineConfig, type Plugin } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -35,11 +36,29 @@ function contentSecurityPolicy(): Plugin {
   };
 }
 
-export default defineConfig({
-  plugins: [react(), tailwindcss(), contentSecurityPolicy()],
+/**
+ * GitHub Pages has no "serve index.html for every page" setting, but it serves 404.html for unknown
+ * paths. A copy of the app's page there makes links like /family work on refresh.
+ */
+function spaFallback(): Plugin {
+  return {
+    name: 'spa-404-fallback',
+    apply: 'build',
+    enforce: 'post',
+    generateBundle(_options, bundle) {
+      const index = bundle['index.html'];
+      if (index?.type === 'asset') this.emitFile({ type: 'asset', fileName: '404.html', source: index.source });
+    },
+  };
+}
+
+export default defineConfig(({ mode }) => ({
+  // The site's path: '/' normally, '/<repo-name>/' on GitHub Pages (set BASE_PATH when building).
+  base: loadEnv(mode, '.', '').BASE_PATH || '/',
+  plugins: [react(), tailwindcss(), contentSecurityPolicy(), spaFallback()],
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
   },
-});
+}));

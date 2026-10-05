@@ -91,6 +91,16 @@ Amounts are rounded to the paisa in calculations and shown in whole rupees in pr
 
 The app is static files, so any static host works. Each family's data still goes only to their own Google Drive.
 
+**GitHub Pages (free, no domain needed)** — the site is published at `https://<username>.github.io/<repo>/` by `.github/workflows/deploy.yml` on every push to `main` (tests must pass first):
+
+1. The repository must be **public** (GitHub Pages on private repositories needs a paid plan). Nothing secret is in the code; `.env.local` is never committed.
+2. On GitHub: **Settings → Pages → Source: GitHub Actions**.
+3. **Settings → Secrets and variables → Actions → Variables → New repository variable**: `VITE_GOOGLE_CLIENT_ID` = your Client ID (a variable, as it is public).
+4. Push to `main`, or run the workflow from the **Actions** tab.
+5. In Google Cloud, add `https://<username>.github.io` (no path) to **Authorized JavaScript origins**.
+
+**Netlify / Cloudflare Pages** — alternatively:
+
 1. Make sure `.env.local` has your Client ID, then run `npm run build`. The ID is baked into `dist/` (it is public, not a secret).
 2. Upload `dist/` to a static host. [Netlify](https://app.netlify.com/drop) (drag and drop the `dist` folder) and Cloudflare Pages both work as is: `dist/_redirects` makes page links work on refresh, and `dist/_headers` adds security headers.
 3. In Google Cloud, add the site's address (e.g. `https://your-site.netlify.app`) to the OAuth client's **Authorized JavaScript origins**, and publish the app. Details in [docs/google-setup.md](docs/google-setup.md#5-let-other-families-sign-in).

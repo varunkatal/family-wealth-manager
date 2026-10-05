@@ -5,7 +5,7 @@ export function Disclaimer() {
   return (
     <p className="text-xs leading-relaxed text-slate-500 dark:text-slate-400">
       {DISCLAIMER_TEXT}{' '}
-      <a href="/privacy.html" className="underline hover:text-slate-700 dark:hover:text-slate-200">
+      <a href={`${import.meta.env.BASE_URL}privacy.html`} className="underline hover:text-slate-700 dark:hover:text-slate-200">
         Privacy
       </a>
     </p>

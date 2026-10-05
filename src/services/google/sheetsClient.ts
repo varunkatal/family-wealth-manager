@@ -90,7 +90,7 @@ export function createSheetsClient(getToken: TokenProvider, fetchImpl: typeof fe
       const created = await call<{ spreadsheetId: string }>(SHEETS, {
         method: 'POST',
         body: JSON.stringify({
-          properties: { title: SPREADSHEET_TITLE, locale: 'en_IN' },
+          properties: { title: SPREADSHEET_TITLE },
           sheets: ALL_TAB_TITLES.map((title) => ({ properties: { title, gridProperties: { frozenRowCount: title === ABOUT_TAB ? 0 : 1 } } })),
         }),
       });

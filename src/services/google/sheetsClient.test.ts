@@ -46,6 +46,7 @@ describe('Google Sheets client', () => {
     const file = await createSheetsClient(token, impl).createAppSpreadsheet();
     expect(file.id).toBe('new1');
     const titles = (calls[0]!.body as { sheets: { properties: { title: string } }[] }).sheets.map((s) => s.properties.title);
+    expect((calls[0]!.body as { properties: object }).properties).toEqual({ title: 'Family Wealth Calculator – data' }); // no locale: Google rejects en_IN
     expect(titles).toEqual(['About', 'Family', 'Assets', 'Ownership', 'Liabilities', 'Investments', 'Income', 'Expenses', 'Goals', 'Snapshots', 'Asset values', 'Settings']);
     expect(calls[1]).toMatchObject({ method: 'PATCH', body: { appProperties: { familyWealthCalculator: 'family-data' } } });
   });

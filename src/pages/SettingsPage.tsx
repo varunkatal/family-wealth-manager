@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useSettings } from '../app/SettingsContext';
+import { useSavesToGoogle } from '../app/SyncContext';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
 import { SegmentedControl } from '../components/SegmentedControl';
@@ -24,11 +25,12 @@ const SAMPLE_AMOUNT = 12500000;
 
 export function SettingsPage() {
   const { settings, loading, updateSettings } = useSettings();
+  const google = useSavesToGoogle();
   const { assets, loading: dataLoading } = useWealthData();
 
   return (
     <>
-      <PageHeader title="Settings" description="Preferences are saved in this browser." />
+      <PageHeader title="Settings" description={google ? 'Preferences are saved with your data in your Google Sheet.' : 'Preferences are saved in this browser.'} />
 
       <Card>
         <h2 className="font-medium">Appearance</h2>

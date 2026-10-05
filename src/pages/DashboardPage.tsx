@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useSettings } from '../app/SettingsContext';
+import { useSavesToGoogle } from '../app/SyncContext';
 import { Card } from '../components/Card';
 import { PageHeader } from '../components/PageHeader';
 import { BarList } from '../components/charts/BarList';
@@ -24,6 +25,7 @@ import { formatINR, formatShare } from '../utils/currency';
 export function DashboardPage() {
   const { members, assets, ownerships, liabilities, wealth, loading, error, run } = useWealthData();
   const { settings } = useSettings();
+  const google = useSavesToGoogle();
   const fmt = (n: number) => formatINR(n, settings.numberFormat);
   const unowned = wealth.unownedAssetIds.length;
   const demoCount = [...members, ...assets, ...liabilities].filter((r) => r.isDemo).length;
@@ -100,7 +102,7 @@ export function DashboardPage() {
                 to see your net worth.
               </>
             )}{' '}
-            Everything you enter stays in this browser on this device.
+            {google ? 'Everything you enter is saved to your own Google Sheet.' : 'Everything you enter stays in this browser on this device.'}
           </p>
         </Card>
       )}

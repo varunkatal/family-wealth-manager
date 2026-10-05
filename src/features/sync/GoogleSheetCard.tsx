@@ -100,7 +100,14 @@ export function GoogleSheetCard() {
             Your data is stored in this browser only. Connect a Google Sheet to keep it in your own Google Drive and use it from other devices.
             The app can open only the spreadsheet it creates.
           </p>
-          <Button className="mt-4" onClick={() => void sync.connect()} disabled={busy || !sync.googleAvailable}>
+          <Button
+            className="mt-4"
+            onPointerEnter={sync.preloadGoogle}
+            onFocus={sync.preloadGoogle}
+            onTouchStart={sync.preloadGoogle}
+            onClick={() => void sync.connect()}
+            disabled={busy || !sync.googleAvailable}
+          >
             Connect Google Sheet
           </Button>
           {!sync.googleAvailable && <p className="mt-2 text-xs text-slate-500">Google sign-in is not set up for this copy of the app.</p>}

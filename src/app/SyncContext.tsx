@@ -53,6 +53,8 @@ type SyncContextValue = {
   /** Changes whenever the browser's data was replaced from the sheet, so pages re-read it. */
   dataVersion: number;
   chooseBrowserOnly: () => void;
+  /** Starts fetching Google's sign-in script (on hover/focus of a Connect button), so the popup opens straight from the click. */
+  preloadGoogle: () => void;
   /** Signs in (if needed), opens the family's sheet and brings browser and sheet in line. Also used to reconnect. */
   connect: () => Promise<void>;
   resolveDecision: (choice: SyncChoice) => Promise<void>;
@@ -115,9 +117,11 @@ export function SyncProvider({ children, auth: authOverride, createClient = defa
   const saveStateRef = useRef(saveState);
   saveStateRef.current = saveState;
 
+  // Google's sign-in script is fetched only when Google is in use (or about to be), never in browser-only use.
   useEffect(() => {
-    if (mode !== 'browser') auth?.preload();
+    if (mode === 'google') auth?.preload();
   }, [auth, mode]);
+  const preloadGoogle = useCallback(() => auth?.preload(), [auth]);
 
   const finishConnected = useCallback((f: SheetFile, saveId: string | null, saved: boolean) => {
     writeRememberedSheet({ spreadsheetId: f.id, saveId });
@@ -384,6 +388,7 @@ export function SyncProvider({ children, auth: authOverride, createClient = defa
     lastSavedAt,
     dataVersion,
     chooseBrowserOnly,
+    preloadGoogle,
     connect,
     resolveDecision,
     saveNow,
@@ -397,6 +402,11 @@ export function useSync(): SyncContextValue {
   const ctx = useContext(SyncContext);
   if (!ctx) throw new Error('useSync must be used inside SyncProvider');
   return ctx;
+}
+
+/** True when data is kept in the family's Google Sheet (for wording that depends on where data lives). */
+export function useSavesToGoogle(): boolean {
+  return useContext(SyncContext)?.mode === 'google';
 }
 
 /** Like useSync, but null outside a SyncProvider (pages rendered on their own in tests). */

@@ -1,5 +1,6 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import { useSettings } from '../app/SettingsContext';
+import { useSavesToGoogle } from '../app/SyncContext';
 import { Button } from '../components/Button';
 import { Card } from '../components/Card';
 import { ConfirmDialog } from '../components/ConfirmDialog';
@@ -33,6 +34,7 @@ const total = (counts: Record<string, number>) => Object.values(counts).reduce((
 export function DataPage() {
   const data = useWealthData();
   const { reload: reloadSettings } = useSettings();
+  const google = useSavesToGoogle();
   const [preview, setPreview] = useState<Preview | null>(null);
   const [fileErrors, setFileErrors] = useState<string[]>([]);
   const [dialog, setDialog] = useState<Dialog>(null);
@@ -101,7 +103,7 @@ export function DataPage() {
     try {
       await data.run(deleteAllData);
       await reloadSettings();
-      setMessage('All data has been deleted from this browser.');
+      setMessage(google ? 'All data has been deleted from this browser and your Google Sheet.' : 'All data has been deleted from this browser.');
       setActionError(null);
     } catch {
       setActionError('Could not delete the data.');
@@ -112,7 +114,14 @@ export function DataPage() {
 
   return (
     <>
-      <PageHeader title="Backup & data" description="Everything is stored only in this browser. Back it up, export it, or delete it." />
+      <PageHeader
+        title="Backup & data"
+        description={
+          google
+            ? 'Your data is saved in your Google Sheet, with a working copy in this browser. Back it up, export it, or delete it.'
+            : 'Everything is stored only in this browser. Back it up, export it, or delete it.'
+        }
+      />
 
       {message && (
         <p role="status" className="mb-4 rounded-lg bg-teal-50 px-4 py-2 text-sm text-teal-900 dark:bg-teal-950 dark:text-teal-100">
@@ -245,7 +254,8 @@ export function DataPage() {
         <Card>
           <h2 className="font-semibold text-red-700 dark:text-red-400">Delete all data</h2>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Permanently removes every family member, asset, loan, investment, goal, snapshot and setting from this browser.
+            Permanently removes every family member, asset, loan, investment, goal, snapshot and setting from this browser
+            {google ? ' and empties your Google Sheet' : ''}.
           </p>
           <Button variant="danger" className="mt-4" onClick={() => setDialog({ kind: 'delete-all' })}>
             Delete all data…
@@ -254,7 +264,8 @@ export function DataPage() {
       </div>
 
       <p className="mt-6 text-xs text-slate-500 dark:text-slate-400">
-        Importing from Excel is not supported yet. To move data between browsers, use Backup and Restore.
+        Importing from Excel is not supported yet.{' '}
+        {google ? 'Other devices get your data by signing in with the same Google account.' : 'To move data between browsers, use Backup and Restore, or connect a Google Sheet.'}
       </p>
 
       {dialog?.kind === 'restore' && preview && (
@@ -263,7 +274,8 @@ export function DataPage() {
           message={
             <p>
               All current data will be deleted and replaced with the {total(preview.counts)} records in{' '}
-              <strong className="text-slate-900 dark:text-slate-100">{preview.fileName}</strong>. This can't be undone.
+              <strong className="text-slate-900 dark:text-slate-100">{preview.fileName}</strong>
+              {google ? ', in this browser and in your Google Sheet' : ''}. This can't be undone.
             </p>
           }
           confirmLabel="Replace all data"
@@ -275,8 +287,10 @@ export function DataPage() {
       {dialog?.kind === 'delete-all' && (
         <Modal title="Delete all data?" onClose={() => setDialog(null)} role="alertdialog">
           <p className="text-sm text-slate-600 dark:text-slate-300">
-            This permanently deletes everything stored by the app in this browser. It can't be undone. Download a backup first
-            if you might need the data.
+            {google
+              ? 'This permanently deletes everything in this browser and in your Google Sheet (the empty sheet stays in your Drive; delete it there if you want). It can’t be undone.'
+              : 'This permanently deletes everything stored by the app in this browser. It can’t be undone.'}{' '}
+            Download a backup first if you might need the data.
           </p>
           <label htmlFor="confirm-delete" className="mt-4 block text-sm font-medium text-slate-700 dark:text-slate-200">
             Type DELETE to confirm

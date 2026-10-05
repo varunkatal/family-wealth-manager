@@ -6,7 +6,7 @@ import { SyncStatusMessage } from '../features/sync/SyncStatusMessage';
 
 /** First screen: choose where the family's data is kept. */
 export function StartPage() {
-  const { googleAvailable, connect, chooseBrowserOnly, status } = useSync();
+  const { googleAvailable, connect, chooseBrowserOnly, preloadGoogle, status } = useSync();
   const busy = status.kind === 'working';
 
   return (
@@ -27,7 +27,14 @@ export function StartPage() {
               <li>The app can open only the spreadsheet it creates, nothing else in your Drive.</li>
               <li>Your data goes only between this browser and Google. Nobody else, including the app’s developer, receives it.</li>
             </ul>
-            <Button className="mt-4" onClick={() => void connect()} disabled={!googleAvailable || busy}>
+            <Button
+              className="mt-4"
+              onPointerEnter={preloadGoogle}
+              onFocus={preloadGoogle}
+              onTouchStart={preloadGoogle}
+              onClick={() => void connect()}
+              disabled={!googleAvailable || busy}
+            >
               Connect Google Sheet
             </Button>
             {!googleAvailable && (

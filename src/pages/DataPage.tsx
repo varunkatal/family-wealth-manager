@@ -6,6 +6,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { inputClass } from '../components/FormField';
 import { Modal } from '../components/Modal';
 import { PageHeader } from '../components/PageHeader';
+import { GoogleSheetCard } from '../features/sync/GoogleSheetCard';
 import { useWealthData } from '../hooks/useWealthData';
 import { toCsv } from '../services/export/csv';
 import { buildExportTables, CSV_TABLES } from '../services/export/tables';
@@ -123,6 +124,8 @@ export function DataPage() {
           {data.error ?? actionError}
         </p>
       )}
+
+      <GoogleSheetCard />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

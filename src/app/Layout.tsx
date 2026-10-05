@@ -2,8 +2,11 @@ import { Suspense, useEffect, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Disclaimer } from '../components/Disclaimer';
 import { Icon } from '../components/Icon';
+import { StorageBadge } from '../features/sync/StorageBadge';
+import { SyncStatusMessage } from '../features/sync/SyncStatusMessage';
 import { NAV_ITEMS } from './navigation';
 import { useSettings } from './SettingsContext';
+import { useOptionalSync } from './SyncContext';
 
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   return (
@@ -44,6 +47,7 @@ export function Layout() {
   const [menuOpen, setMenuOpen] = useState(false);
   const location = useLocation();
   const { error } = useSettings();
+  const sync = useOptionalSync();
 
   // Close the mobile menu whenever the route changes.
   useEffect(() => setMenuOpen(false), [location.pathname]);
@@ -100,11 +104,12 @@ export function Layout() {
             <Icon name="menu" />
           </button>
           <span className="truncate font-semibold md:hidden">Family Wealth Calculator</span>
-          <span className="ml-auto shrink-0 whitespace-nowrap rounded-full bg-slate-100 px-2.5 py-1 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            <span className="sm:hidden">Local only</span>
-            <span className="hidden sm:inline">Stored on this device only</span>
-          </span>
+          <div className="ml-auto">
+            <StorageBadge />
+          </div>
         </header>
+
+        {sync?.mode === 'google' && sync.status.kind === 'error' && <SyncStatusMessage className="mx-4 mt-3 md:mx-8" />}
 
         {error && (
           <div role="alert" className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 md:px-8 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200">

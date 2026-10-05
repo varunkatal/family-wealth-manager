@@ -100,7 +100,22 @@ describe('Google Sheets client', () => {
     const posts = calls.filter((c) => c.method === 'POST');
     expect((posts[0]!.body as any).requests).toEqual([{ addSheet: { properties: { title: 'Goals' } } }]);
     const cells = (posts[1]!.body as any).requests.find((r: any) => r.updateCells).updateCells;
-    expect(cells.range).toEqual({ sheetId: 3, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 1 }); // emptied
+    expect(cells.range).toEqual({ sheetId: 3, startRowIndex: 0, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 1 }); // emptied
+  });
+
+  it('keeps a row below the frozen header, which Google requires', async () => {
+    const { impl, calls } = fakeFetch((_url, method) =>
+      method === 'POST' ? { json: {} } : { json: { sheets: [...meta.sheets, { properties: { sheetId: 9, title: 'Family' } }] } },
+    );
+    await createSheetsClient(token, impl).writeTabs('s1', [
+      { title: 'About', rows: [['App', 'family-wealth-calculator']] },
+      { title: 'Family', rows: [['id', 'name']] }, // header only
+    ]);
+    const requests = (calls.find((c) => c.method === 'POST')!.body as { requests: any[] }).requests;
+    const grid = (id: number) => requests.find((r) => r.updateSheetProperties?.properties.sheetId === id).updateSheetProperties.properties.gridProperties;
+    expect(grid(9)).toEqual({ rowCount: 2, columnCount: 2, frozenRowCount: 1 });
+    expect(grid(0)).toEqual({ rowCount: 1, columnCount: 2, frozenRowCount: 0 });
+    expect(requests.find((r) => r.updateCells?.range.sheetId === 9).updateCells.range.endRowIndex).toBe(2); // spare row cleared
   });
 
   it('turns Google errors into GoogleApiError, flagging expired sign-ins', async () => {

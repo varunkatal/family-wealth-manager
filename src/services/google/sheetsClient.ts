@@ -129,9 +129,10 @@ export function createSheetsClient(getToken: TokenProvider, fetchImpl: typeof fe
       }
       const requests = tabs.flatMap((tab) => {
         const sheetId = ids.get(tab.title)!;
-        const rowCount = Math.max(tab.rows.length, 1);
-        const columnCount = Math.max(1, ...tab.rows.map((r) => r.length));
         const isData = tab.title !== ABOUT_TAB;
+        // Google refuses a tab with no rows below the frozen header, so data tabs keep at least one (blank) row.
+        const rowCount = Math.max(tab.rows.length, isData ? 2 : 1);
+        const columnCount = Math.max(1, ...tab.rows.map((r) => r.length));
         return [
           {
             updateSheetProperties: {

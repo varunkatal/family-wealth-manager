@@ -19,7 +19,7 @@ export const BACKUP_APP = 'family-wealth-calculator';
 export const BACKUP_FORMAT_VERSION = 1;
 
 /** Record stores (everything except settings), in a safe write order. */
-const RECORD_STORES = {
+export const RECORD_STORES = {
   familyMembers: familyMemberSchema,
   assets: assetSchema,
   assetOwnerships: assetOwnershipSchema,
@@ -31,8 +31,8 @@ const RECORD_STORES = {
   snapshots: snapshotSchema,
   assetValuations: assetValuationSchema,
 } satisfies Partial<Record<keyof WealthDB, ZodType>>;
-type RecordStore = keyof typeof RECORD_STORES;
-const STORE_NAMES = Object.keys(RECORD_STORES) as RecordStore[];
+export type RecordStore = keyof typeof RECORD_STORES;
+export const STORE_NAMES = Object.keys(RECORD_STORES) as RecordStore[];
 const ALL_STORES = ['settings', ...STORE_NAMES] as const;
 
 export const STORE_LABELS: Record<RecordStore, string> = {
@@ -77,6 +77,11 @@ export function parseBackup(text: string): ParsedBackup {
   } catch {
     return { ok: false, errors: ['This file is not valid JSON.'] };
   }
+  return validateBackup(raw);
+}
+
+/** Validates backup data already read into an object (from a file or a Google Sheet). Nothing is written. */
+export function validateBackup(raw: unknown): ParsedBackup {
   const obj = raw as Partial<Backup> | null;
   if (!obj || typeof obj !== 'object' || obj.app !== BACKUP_APP) {
     return { ok: false, errors: ['This is not a Family Wealth Calculator backup.'] };

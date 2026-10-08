@@ -1,4 +1,4 @@
-import { familyOwnedValueOf, sharesByAsset } from './netWorth';
+import { calculateOwnershipValue, familyOwnedValueOf, sharesByAsset } from './netWorth';
 import { roundToPaise } from './rounding';
 
 /**
@@ -73,4 +73,39 @@ export function calculateTopAssets<A extends AllocAsset>(assets: A[], ownerships
     .sort((a, b) => b.familyValue - a.familyValue || a.asset.name.localeCompare(b.asset.name))
     .slice(0, limit)
     .map((r) => ({ ...r, percentage: total > 0 ? (r.familyValue / total) * 100 : 0 }));
+}
+
+export type MemberHolding<A> = {
+  asset: A;
+  /** This member's share of the asset, in %. */
+  percentage: number;
+  /** Value attributed to this member: asset value × share. */
+  value: number;
+  /** The asset's other owners and their shares. */
+  coOwners: { familyMemberId: string; percentage: number }[];
+};
+
+/** Everything one member owns, with their share and attributed value, largest first. */
+export function calculateMemberHoldings<A extends { id: string; name: string; currentValue: number }>(
+  memberId: string,
+  assets: A[],
+  ownerships: Ownership[],
+): MemberHolding<A>[] {
+  const byAsset = ownershipIndex(ownerships);
+  return assets
+    .flatMap((asset) => {
+      const owners = byAsset.get(asset.id) ?? [];
+      const mine = owners.filter((o) => o.familyMemberId === memberId);
+      if (mine.length === 0) return [];
+      const percentage = mine.reduce((s, o) => s + o.percentage, 0);
+      return [
+        {
+          asset,
+          percentage,
+          value: calculateOwnershipValue(asset.currentValue, percentage),
+          coOwners: owners.filter((o) => o.familyMemberId !== memberId).map(({ familyMemberId, percentage: p }) => ({ familyMemberId, percentage: p })),
+        },
+      ];
+    })
+    .sort((a, b) => b.value - a.value || a.asset.name.localeCompare(b.asset.name));
 }

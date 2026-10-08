@@ -3,6 +3,7 @@ import {
   calculateFamilyOwnedValue,
   calculateLiquidityBreakdown,
   calculateMemberAllocation,
+  calculateMemberHoldings,
   calculateTopAssets,
 } from './allocation';
 import { calculateTotalAssets } from './netWorth';
@@ -111,5 +112,41 @@ describe('top assets', () => {
   it('computes one asset family value', () => {
     expect(calculateFamilyOwnedValue({ id: 'fd', currentValue: 500000 }, ownerships)).toBe(500000);
     expect(calculateFamilyOwnedValue({ id: 'none', currentValue: 500000 }, ownerships)).toBe(0);
+  });
+});
+
+describe('calculateMemberHoldings', () => {
+  const assets = [
+    { id: 'house', name: 'Example Property', currentValue: 10000000 },
+    { id: 'fund', name: 'Example Equity Fund', currentValue: 500000 },
+    { id: 'gold', name: 'Example Gold', currentValue: 300000 },
+  ];
+  const owns = [
+    { assetId: 'house', familyMemberId: 'a', percentage: 60 },
+    { assetId: 'house', familyMemberId: 'b', percentage: 40 },
+    { assetId: 'fund', familyMemberId: 'a', percentage: 100 },
+    { assetId: 'gold', familyMemberId: 'b', percentage: 100 },
+  ];
+
+  it('lists what one person owns, their share and value, largest first', () => {
+    const a = calculateMemberHoldings('a', assets, owns);
+    expect(a.map((h) => [h.asset.id, h.percentage, h.value])).toEqual([
+      ['house', 60, 6000000],
+      ['fund', 100, 500000],
+    ]);
+    expect(a[0]!.coOwners).toEqual([{ familyMemberId: 'b', percentage: 40 }]);
+    expect(a[1]!.coOwners).toEqual([]);
+  });
+
+  it('adds up to the same total as the member net worth engine', () => {
+    for (const id of ['a', 'b']) {
+      const total = calculateMemberHoldings(id, assets, owns).reduce((s, h) => s + h.value, 0);
+      const allocation = calculateMemberAllocation(id, assets.map((x) => ({ ...x, assetClass: 'X', liquidity: 'liquid' as const })), owns);
+      expect(total).toBeCloseTo(allocation.reduce((s, x) => s + x.value, 0), 2);
+    }
+  });
+
+  it('is empty for someone who owns nothing', () => {
+    expect(calculateMemberHoldings('c', assets, owns)).toEqual([]);
   });
 });

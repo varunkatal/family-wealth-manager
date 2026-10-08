@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useSettings } from '../app/SettingsContext';
 import { DemoBadge } from '../components/Badge';
 import { Button } from '../components/Button';
@@ -239,7 +240,11 @@ function MemberCard({ member, wealth, fmt, onEdit, onDelete }: MemberCardProps) 
   return (
     <Card className={`flex h-full flex-col ${member.isActive ? '' : 'opacity-70'}`}>
       <div className="flex items-start justify-between gap-3">
-        <h3 className="min-w-0 break-words font-semibold">{member.name}</h3>
+        <h3 className="min-w-0 break-words font-semibold">
+          <Link to={`/family/${member.id}`} className="hover:text-teal-700 hover:underline dark:hover:text-teal-400">
+            {member.name}
+          </Link>
+        </h3>
         {member.isDemo && <DemoBadge />}
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
@@ -273,7 +278,14 @@ function MemberCard({ member, wealth, fmt, onEdit, onDelete }: MemberCardProps) 
       {member.notes && (
         <p className="mt-3 line-clamp-3 whitespace-pre-line text-sm text-slate-600 dark:text-slate-300">{member.notes}</p>
       )}
-      <div className="mt-auto flex gap-2 pt-4">
+      <div className="mt-auto flex flex-wrap gap-2 pt-4">
+        <Link
+          to={`/family/${member.id}`}
+          aria-label={`View details for ${member.name}`}
+          className="inline-flex items-center justify-center rounded-lg bg-teal-700 px-3.5 py-2 text-sm font-medium text-white hover:bg-teal-800 dark:bg-teal-600 dark:hover:bg-teal-500"
+        >
+          View details
+        </Link>
         <Button variant="secondary" onClick={onEdit} aria-label={`Edit ${member.name}`}>
           Edit
         </Button>

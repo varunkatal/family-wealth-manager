@@ -8,6 +8,7 @@ import { Layout } from './Layout';
 const page = <K extends string>(load: () => Promise<Record<K, ComponentType>>, name: K) =>
   lazy(() => load().then((m) => ({ default: m[name] })));
 const FamilyPage = page(() => import('../pages/FamilyPage'), 'FamilyPage');
+const MemberDetailPage = page(() => import('../pages/MemberDetailPage'), 'MemberDetailPage');
 const AssetsPage = page(() => import('../pages/AssetsPage'), 'AssetsPage');
 const LiabilitiesPage = page(() => import('../pages/LiabilitiesPage'), 'LiabilitiesPage');
 const ContributionsPage = page(() => import('../pages/ContributionsPage'), 'ContributionsPage');
@@ -24,6 +25,7 @@ export function AppRoutes() {
       <Route element={<Layout />}>
         <Route index element={<DashboardPage />} />
         <Route path="family" element={<FamilyPage />} />
+        <Route path="family/:memberId" element={<MemberDetailPage />} />
         <Route path="assets" element={<AssetsPage />} />
         <Route path="liabilities" element={<LiabilitiesPage />} />
         <Route path="investments" element={<ContributionsPage />} />

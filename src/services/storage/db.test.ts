@@ -1,5 +1,6 @@
 import { openDB } from 'idb';
 import { closeDb, DB_NAME, getDb } from './db';
+import { DEFAULT_CRORE_PLANNER } from '../../models/settings';
 import { getSettings } from './settingsRepository';
 
 describe('database upgrade', () => {
@@ -15,6 +16,6 @@ describe('database upgrade', () => {
     await closeDb();
     const db = await getDb();
     expect([...db.objectStoreNames]).toEqual(expect.arrayContaining(['settings', 'familyMembers', 'assets', 'assetOwnerships', 'liabilities']));
-    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'exact', inflationRate: 6, classDefaults: {} });
+    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'exact', inflationRate: 6, classDefaults: {}, crorePlanner: DEFAULT_CRORE_PLANNER });
   });
 });

@@ -14,6 +14,7 @@ const LiabilitiesPage = page(() => import('../pages/LiabilitiesPage'), 'Liabilit
 const ContributionsPage = page(() => import('../pages/ContributionsPage'), 'ContributionsPage');
 const CashFlowPage = page(() => import('../pages/CashFlowPage'), 'CashFlowPage');
 const GoalsPage = page(() => import('../pages/GoalsPage'), 'GoalsPage');
+const CrorePage = page(() => import('../pages/CrorePage'), 'CrorePage');
 const ProjectionsPage = page(() => import('../pages/ProjectionsPage'), 'ProjectionsPage');
 const HistoryPage = page(() => import('../pages/HistoryPage'), 'HistoryPage');
 const DataPage = page(() => import('../pages/DataPage'), 'DataPage');
@@ -31,6 +32,7 @@ export function AppRoutes() {
         <Route path="investments" element={<ContributionsPage />} />
         <Route path="cash-flow" element={<CashFlowPage />} />
         <Route path="goals" element={<GoalsPage />} />
+        <Route path="crore" element={<CrorePage />} />
         <Route path="projections" element={<ProjectionsPage />} />
         <Route path="history" element={<HistoryPage />} />
         <Route path="data" element={<DataPage />} />

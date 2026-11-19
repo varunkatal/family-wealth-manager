@@ -6,8 +6,8 @@ import { resolveAssetRate, type ClassDefaults, type RateSource, type Scenario } 
 import type { SIPYearRow } from './sip';
 import { roundToPaise } from './rounding';
 
-type ProjAsset = Parameters<typeof resolveAssetRate>[0] & { id: string; name: string; currentValue: number };
-type ProjContribution = Parameters<typeof projectContributions>[0][number];
+export type ProjAsset = Parameters<typeof resolveAssetRate>[0] & { id: string; name: string; currentValue: number };
+export type ProjContribution = Parameters<typeof projectContributions>[0][number];
 type Ownership = { assetId: string; familyMemberId: string; percentage: number };
 
 export type FamilyProjectionInput<A extends ProjAsset, C extends ProjContribution> = {

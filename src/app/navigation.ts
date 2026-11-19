@@ -15,6 +15,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: '/investments', label: 'Investments', icon: 'investments' },
   { to: '/cash-flow', label: 'Cash flow', icon: 'cashflow' },
   { to: '/goals', label: 'Goals', icon: 'goals' },
+  { to: '/crore', label: '₹1 Cr Planner', icon: 'crore' },
   { to: '/projections', label: 'Projections', icon: 'projections' },
   { to: '/history', label: 'History', icon: 'history' },
   { to: '/data', label: 'Backup & data', icon: 'data' },

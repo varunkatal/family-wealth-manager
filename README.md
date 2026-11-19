@@ -83,6 +83,8 @@ Net worth = total family-owned assets − total outstanding liabilities.
 
 **Goals.** Remaining = target − saved. The required monthly saving uses the same conventions as SIPs (money already saved grows yearly at the goal's expected return, or 0% if none is set). Wealth milestones (₹25 lakh to ₹5 crore, or a custom amount) are estimated from projected net worth under each scenario, interpolating between yearly points, so dates are approximate.
 
+**₹1 Cr Planner.** A plan is a starting amount (the family-owned value of the assets you tick; liquid and semi-liquid ones by default) plus a monthly investment that can rise every 12 months, all growing at one return you choose (by default the value-weighted rate of the ticked assets, or 12%). Fill in two of years, monthly investment and return, and the third is worked out: the monthly amount from the SIP formula, the time by stepping month by month (up to 50 years), and the return by narrowing it down to 0.01% (up to 100%). The "faster options" table shows the monthly amount needed for 3 to 20 years. With "today's money", the target rises with inflation. Loans are not subtracted, and this page's single return does not change other pages, which use each asset's own rates. Your choices are saved with your settings.
+
 **History.** Snapshots store the totals as they were on a date and are never recalculated. Changes and percentage changes compare each snapshot with the previous one; month over month uses the latest snapshot in each month. Asset value history is recorded automatically whenever an asset's value or valuation date changes.
 
 Amounts are rounded to the paisa in calculations and shown in whole rupees in projections.

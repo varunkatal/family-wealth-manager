@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, type AppSettings } from '../../models/settings';
+import { DEFAULT_CRORE_PLANNER, DEFAULT_SETTINGS, type AppSettings } from '../../models/settings';
 import { closeDb, getDb } from './db';
 import { getSettings, saveSettings } from './settingsRepository';
 
@@ -10,7 +10,7 @@ describe('settingsRepository', () => {
   it('saves settings and reads them back after reopening the database', async () => {
     await saveSettings({ ...DEFAULT_SETTINGS, theme: 'dark', numberFormat: 'compact', inflationRate: 5.5, classDefaults: { Equity: { base: 11 } } });
     await closeDb(); // simulates a page refresh
-    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'compact', inflationRate: 5.5, classDefaults: { Equity: { base: 11 } } });
+    expect(await getSettings()).toEqual({ theme: 'dark', numberFormat: 'compact', inflationRate: 5.5, classDefaults: { Equity: { base: 11 } }, crorePlanner: DEFAULT_CRORE_PLANNER });
   });
 
   it('loads settings saved before a field existed, keeping stored values', async () => {

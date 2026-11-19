@@ -86,6 +86,24 @@ export function calculateGrowingSIPFutureValue(input: GrowingSIPInput): SIPResul
   return { invested: last.invested, futureValue: last.value, gains: roundToPaise(last.value - last.invested) };
 }
 
+/**
+ * Value after `months` of a monthly SIP that starts at `payment` and rises by `annualIncrease` %
+ * every 12 months (same conventions as projectGrowingSIPByYear, but for any number of months).
+ */
+export function calculateGrowingSIPValueAfterMonths(
+  payment: number,
+  annualRatePct: number,
+  months: number,
+  annualIncrease = 0,
+): number {
+  const i = annualRatePct / 100 / 12;
+  let balance = 0;
+  for (let m = 0; m < months; m++) {
+    balance = balance * (1 + i) + payment * (1 + annualIncrease / 100) ** Math.floor(m / 12);
+  }
+  return roundToPaise(balance);
+}
+
 // ---------------------------------------------------------------------------
 // Dated contributions (saved recurring investments) projected from today.
 
